@@ -4,7 +4,7 @@ import iconUrl from "../../../src-tauri/icons/128x128.png";
 
 const VERSION = "0.1.0";
 const BUILD_INFO = "Apr 2026 — Windows 64-bit";
-const GITHUB_URL = "https://github.com/hyji-app/hyji";
+const GITHUB_URL = "https://github.com/inyoungoh-cde/hyji";
 
 interface Props {
   onClose: () => void;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Splitter } from "./components/layout/Splitter";
 import { PdfViewer } from "./components/layout/PdfViewer";
@@ -40,6 +41,7 @@ export default function App() {
       onMenuEvent("toggle-tracker", toggleTracker),
       onMenuEvent("about", () => setAboutOpen(true)),
       onMenuEvent("shortcuts", () => setShortcutsOpen(true)),
+      onMenuEvent("github", () => shellOpen("https://github.com/inyoungoh-cde/hyji")),
     ];
     return () => unsubs.forEach((fn) => fn());
   }, [toggleSidebar, toggleTracker]);
