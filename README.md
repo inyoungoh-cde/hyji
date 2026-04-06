@@ -119,6 +119,21 @@ Please keep PRs focused — one feature or fix per PR.
 
 ---
 
+## Changelog
+
+### v0.1.1 (Apr 2026)
+- Improved Questions section color — more vivid violet for better readability
+- Added text size options (Default / Large / X-Large) in View menu
+- Converted all font sizes to rem units for consistent scaling
+- Connected About HYJI and Help menu GitHub links to repository
+
+### v0.1.0 (Apr 2026)
+- Initial release — PDF viewer, highlights, bidirectional notes, Smart Paste, keyword graph, dashboard, BibTeX export
+
+[See full changelog →](./CHANGELOG.md)
+
+---
+
 ## License
 
 MIT License © 2026 HJ & IY — see [LICENSE](./LICENSE) for full text.
