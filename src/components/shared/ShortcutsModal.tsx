@@ -61,7 +61,7 @@ function KeyBadge({ combo }: { combo: string }) {
       {keys.map((key, i) => (
         <span key={i}>
           {i > 0 && <span className="text-text-tertiary mx-0.5">+</span>}
-          <kbd className="inline-block bg-bg-tertiary border border-border rounded px-1.5 py-0.5 text-[11px] font-mono text-text-secondary leading-tight min-w-[20px] text-center">
+          <kbd className="inline-block bg-bg-tertiary border border-border rounded px-1.5 py-0.5 text-small font-mono text-text-secondary leading-tight min-w-[20px] text-center">
             {key}
           </kbd>
         </span>
@@ -76,7 +76,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
       <div className="max-h-[60vh] overflow-y-auto -mx-1 px-1 space-y-4">
         {SHORTCUT_CATEGORIES.map((cat) => (
           <div key={cat.label}>
-            <h3 className="text-[11px] font-bold uppercase tracking-[1px] text-text-tertiary mb-2">
+            <h3 className="text-small font-bold uppercase tracking-[1px] text-text-tertiary mb-2">
               {cat.label}
             </h3>
             <div className="space-y-1.5">
@@ -85,7 +85,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
                   key={combo}
                   className="flex items-center justify-between py-0.5"
                 >
-                  <span className="text-[12px] text-text-secondary">{desc}</span>
+                  <span className="text-section text-text-secondary">{desc}</span>
                   <KeyBadge combo={combo} />
                 </div>
               ))}

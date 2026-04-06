@@ -51,14 +51,14 @@ export function ContextMenu({ state, onClose, onHighlight, onAddMemo, onSendTo, 
       className="fixed z-[200] bg-bg-secondary border border-border rounded-[8px] py-1 shadow-xl min-w-[220px]"
       style={{ left: state.x, top: state.y }}
     >
-      <div className="px-3 py-1 text-[10px] text-text-tertiary truncate max-w-[250px]">
+      <div className="px-3 py-1 text-caption text-text-tertiary truncate max-w-[250px]">
         "{state.selectedText.slice(0, 60)}{state.selectedText.length > 60 ? "\u2026" : ""}"
       </div>
       <div className="border-t border-border my-1" />
 
       {/* Highlight color picker */}
       <div className="px-3 py-1.5 flex items-center gap-2">
-        <span className="text-[11px] text-text-secondary mr-1">Highlight</span>
+        <span className="text-small text-text-secondary mr-1">Highlight</span>
         {HIGHLIGHT_COLORS.map((c) => (
           <button
             key={c.hex}
@@ -85,7 +85,7 @@ export function ContextMenu({ state, onClose, onHighlight, onAddMemo, onSendTo, 
         <span className="text-small">✦</span> Send to Differentiation
       </button>
       <button
-        className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-[#7209b7] transition-colors flex items-center gap-2"
+        className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-[#a78bfa] transition-colors flex items-center gap-2"
         onClick={() => onSendTo("questions")}
       >
         <span className="text-small">?</span> Send to Questions

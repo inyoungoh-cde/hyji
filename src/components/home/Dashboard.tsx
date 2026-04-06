@@ -64,7 +64,7 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
       <div className="max-w-2xl mx-auto px-10 py-12">
 
         {/* Title */}
-        <h1 className="text-[22px] font-semibold text-text-primary mb-8">
+        <h1 className="text-subtitle font-semibold text-text-primary mb-8">
           HYJI — Highlight Your Journey of Insights
         </h1>
 
@@ -74,7 +74,7 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
           <QuickAction icon="📋" label="Smart Paste" onClick={onSmartPaste} />
           {creatingProject ? (
             <div className="flex items-center gap-2 px-4 py-3 rounded-[10px] border border-accent/50 bg-bg-tertiary">
-              <span className="text-[18px]">📁</span>
+              <span className="text-title">📁</span>
               <input
                 ref={inputRef}
                 value={newProjectName}
@@ -133,10 +133,10 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
                     onClick={() => handleProjectClick(proj.id)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-border bg-bg-secondary hover:border-accent/40 hover:bg-bg-tertiary transition-colors text-small text-text-secondary hover:text-text-primary"
                   >
-                    <span className="text-[12px]">📁</span>
+                    <span className="text-section">📁</span>
                     <span>{proj.name}</span>
                     {count > 0 && (
-                      <span className="text-[10px] text-text-tertiary ml-0.5">{count}</span>
+                      <span className="text-caption text-text-tertiary ml-0.5">{count}</span>
                     )}
                   </button>
                 );
@@ -195,7 +195,7 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">
+    <div className="text-small font-bold uppercase tracking-wider text-text-tertiary">
       {children}
     </div>
   );
@@ -215,7 +215,7 @@ function QuickAction({
       onClick={onClick}
       className="flex flex-col items-center gap-1.5 px-5 py-3 rounded-[10px] border border-border bg-bg-secondary hover:border-accent/40 hover:bg-bg-tertiary transition-colors duration-150 text-text-secondary hover:text-text-primary"
     >
-      <span className="text-[22px]">{icon}</span>
+      <span className="text-subtitle">{icon}</span>
       <span className="text-small font-medium">{label}</span>
     </button>
   );
@@ -233,12 +233,12 @@ function StatCard({
   return (
     <div className="flex flex-col items-center gap-1 px-3 py-3 rounded-[8px] bg-bg-secondary border border-border">
       <span
-        className="text-[22px] font-semibold leading-none"
+        className="text-subtitle font-semibold leading-none"
         style={{ color: accent ?? "var(--text-primary)" }}
       >
         {value}
       </span>
-      <span className="text-[10px] text-text-tertiary font-medium">{label}</span>
+      <span className="text-caption text-text-tertiary font-medium">{label}</span>
     </div>
   );
 }
@@ -261,16 +261,16 @@ function StartStep({
   return (
     <div className="flex flex-col gap-2 px-4 py-4 rounded-[10px] border border-border bg-bg-secondary">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-bold text-text-tertiary bg-bg-tertiary rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+        <span className="text-caption font-bold text-text-tertiary bg-bg-tertiary rounded-full w-5 h-5 flex items-center justify-center shrink-0">
           {num}
         </span>
-        <span className="text-[18px]">{icon}</span>
+        <span className="text-title">{icon}</span>
         <span className="text-body font-semibold text-text-primary">{title}</span>
       </div>
       <p className="text-small text-text-tertiary leading-relaxed">{description}</p>
       <button
         onClick={onAction}
-        className="mt-auto self-start text-[11px] font-medium text-accent hover:opacity-80 transition-opacity"
+        className="mt-auto self-start text-small font-medium text-accent hover:opacity-80 transition-opacity"
       >
         {actionLabel} →
       </button>
@@ -303,7 +303,7 @@ function RecentPaperCard({
       </div>
       <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
         <span
-          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${statusColors[paper.status] ?? ""}`}
+          className={`inline-block px-1.5 py-0.5 rounded text-caption font-bold border ${statusColors[paper.status] ?? ""}`}
         >
           {paper.status === "Fully Reviewed"
             ? "Reviewed"
@@ -311,7 +311,7 @@ function RecentPaperCard({
               ? "Revisit"
               : paper.status}
         </span>
-        <span className="text-[10px] text-text-tertiary">{paper.date_read}</span>
+        <span className="text-caption text-text-tertiary">{paper.date_read}</span>
       </div>
     </button>
   );

@@ -43,10 +43,14 @@ export default {
         mono: ["'SF Mono'", "'Cascadia Code'", "'Fira Code'", "monospace"],
       },
       fontSize: {
-        title: "18px",
-        section: "12px",
-        body: "13px",
-        small: "11px",
+        nano:     "0.615rem",  // 8px
+        micro:    "0.692rem",  // 9px
+        caption:  "0.769rem",  // 10px
+        small:    "0.846rem",  // 11px
+        section:  "0.923rem",  // 12px
+        body:     "1rem",      // 13px
+        title:    "1.385rem",  // 18px
+        subtitle: "1.692rem",  // 22px
       },
     },
   },

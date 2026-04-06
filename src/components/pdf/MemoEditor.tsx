@@ -74,11 +74,11 @@ export function MemoEditor({ annotation, initialX, initialY, onSave, onDelete, o
         className="flex items-center justify-between px-3 py-1.5 cursor-grab active:cursor-grabbing border-b border-border"
         onMouseDown={onDragStart}
       >
-        <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-bold select-none">
+        <span className="text-caption text-text-tertiary uppercase tracking-wider font-bold select-none">
           📝 Memo
         </span>
         <button
-          className="text-[13px] text-text-tertiary hover:text-text-primary leading-none px-0.5 transition-colors"
+          className="text-body text-text-tertiary hover:text-text-primary leading-none px-0.5 transition-colors"
           title="Close (Esc)"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={handleSave}
@@ -96,18 +96,18 @@ export function MemoEditor({ annotation, initialX, initialY, onSave, onDelete, o
           placeholder="Write a memo..."
           style={{ userSelect: "text" }}
         />
-        <div className="text-[9px] text-text-tertiary mt-1 mb-2 truncate opacity-60">
+        <div className="text-micro text-text-tertiary mt-1 mb-2 truncate opacity-60">
           "{annotation.selected_text.slice(0, 45)}{annotation.selected_text.length > 45 ? "\u2026" : ""}"
         </div>
         <div className="flex items-center justify-between">
           <button
-            className="text-[11px] text-[var(--status-revisit)] hover:opacity-100 opacity-60 transition-opacity"
+            className="text-small text-[var(--status-revisit)] hover:opacity-100 opacity-60 transition-opacity"
             onClick={onDelete}
           >
             Delete
           </button>
           <button
-            className="px-3 py-1 rounded text-[11px] bg-accent text-bg-primary font-medium hover:bg-accent/90 transition-colors"
+            className="px-3 py-1 rounded text-small bg-accent text-bg-primary font-medium hover:bg-accent/90 transition-colors"
             onClick={handleSave}
           >
             Save

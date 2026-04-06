@@ -147,14 +147,14 @@ export function PaperControls({
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowSearch((s) => !s)}
-            className={`text-[12px] transition-colors ${showSearch ? "text-accent" : "text-text-tertiary hover:text-text-secondary"}`}
+            className={`text-section transition-colors ${showSearch ? "text-accent" : "text-text-tertiary hover:text-text-secondary"}`}
             title="Search papers (Ctrl+Shift+F)"
           >
             ⌕
           </button>
           <button
             onClick={() => { onSelectMode(!selectMode); }}
-            className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
+            className={`text-caption font-bold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
               selectMode ? "bg-accent text-bg-primary" : "text-text-tertiary hover:text-accent"
             }`}
             title="Select mode for export"
@@ -182,7 +182,7 @@ export function PaperControls({
             value={searchQuery}
             onChange={(e) => onSearchQuery(e.target.value)}
             placeholder="Search papers…"
-            className="w-full bg-bg-tertiary border border-border rounded-[6px] px-2 py-0.5 text-[11px] text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/40"
+            className="w-full bg-bg-tertiary border border-border rounded-[6px] px-2 py-0.5 text-small text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/40"
           />
         </div>
       )}
@@ -193,7 +193,7 @@ export function PaperControls({
           <button
             key={s}
             onClick={() => onStatusFilter(statusFilter === s ? null : s)}
-            className={`px-1 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+            className={`px-1 py-0.5 rounded text-caption font-bold border transition-colors ${
               statusFilter === s
                 ? statusColors[s]
                 : "bg-transparent text-text-tertiary border-transparent hover:border-border hover:text-text-secondary"
@@ -207,7 +207,7 @@ export function PaperControls({
           <button
             key={imp}
             onClick={() => onImportanceFilter(importanceFilter === imp ? null : imp)}
-            className={`px-1 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+            className={`px-1 py-0.5 rounded text-caption font-bold border transition-colors ${
               importanceFilter === imp
                 ? importanceColors[imp]
                 : "bg-transparent text-text-tertiary border-transparent hover:border-border hover:text-text-secondary"
@@ -219,7 +219,7 @@ export function PaperControls({
         {hasFilters && (
           <button
             onClick={() => { onStatusFilter(null); onImportanceFilter(null); onSearchQuery(""); }}
-            className="px-1 py-0.5 rounded text-[10px] border-transparent text-text-tertiary hover:text-accent transition-colors ml-0.5"
+            className="px-1 py-0.5 rounded text-caption border-transparent text-text-tertiary hover:text-accent transition-colors ml-0.5"
           >
             ✕
           </button>
@@ -228,7 +228,7 @@ export function PaperControls({
         <select
           value={sortBy}
           onChange={(e) => onSortBy(e.target.value)}
-          className="text-[10px] bg-bg-tertiary text-text-secondary border border-border rounded px-1 py-0.5 outline-none focus:border-accent/40 cursor-pointer"
+          className="text-caption bg-bg-tertiary text-text-secondary border border-border rounded px-1 py-0.5 outline-none focus:border-accent/40 cursor-pointer"
         >
           <option value="manual">Order</option>
           <option value="date_read">Date</option>
@@ -244,17 +244,17 @@ export function PaperControls({
         <div className="px-3 pb-1.5 flex items-center gap-2 border-t border-border pt-1.5">
           <button
             onClick={() => onSelectAll(papers.map((p) => p.id))}
-            className="text-[10px] text-accent hover:opacity-80"
+            className="text-caption text-accent hover:opacity-80"
           >
             All
           </button>
           <button
             onClick={onSelectNone}
-            className="text-[10px] text-text-tertiary hover:text-text-secondary"
+            className="text-caption text-text-tertiary hover:text-text-secondary"
           >
             None
           </button>
-          <span className="text-[10px] text-text-tertiary ml-auto">{selectedIds.size} selected</span>
+          <span className="text-caption text-text-tertiary ml-auto">{selectedIds.size} selected</span>
         </div>
       )}
 
@@ -272,8 +272,8 @@ export function PaperControls({
               disabled={exporting}
               className="w-full flex items-center justify-between px-2 py-1 rounded-[5px] border border-border bg-bg-tertiary hover:border-accent/40 disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
             >
-              <span className="text-[10px] font-medium text-text-primary">{label}</span>
-              <span className="text-[10px] text-text-tertiary">
+              <span className="text-caption font-medium text-text-primary">{label}</span>
+              <span className="text-caption text-text-tertiary">
                 {selectedIds.size > 0 ? `${selectedIds.size}` : "all"}
               </span>
             </button>

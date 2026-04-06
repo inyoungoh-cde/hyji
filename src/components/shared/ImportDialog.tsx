@@ -119,7 +119,7 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
       <div className="flex flex-col gap-3">
         {/* PDF file path */}
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1">
+          <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
             PDF File
           </label>
           <div className="flex gap-2">
@@ -141,7 +141,7 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
         {/* Title — only when creating new */}
         {!activePaper && (
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1">
+            <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
               Title
               {extracting && (
                 <span className="ml-2 text-accent normal-case font-normal tracking-normal">extracting…</span>
@@ -158,7 +158,7 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
 
         {/* Storage mode */}
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2">
+          <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-2">
             Storage
           </label>
           <div className="flex gap-3">
@@ -172,7 +172,7 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
               />
               <div>
                 <div className="text-body text-text-primary">Link from current location</div>
-                <div className="text-[10px] text-text-tertiary">Reference the original file</div>
+                <div className="text-caption text-text-tertiary">Reference the original file</div>
               </div>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -185,7 +185,7 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
               />
               <div>
                 <div className="text-body text-text-primary">Copy into project</div>
-                <div className="text-[10px] text-text-tertiary">
+                <div className="text-caption text-text-tertiary">
                   {targetProject?.folder_path
                     ? `→ ${targetProject.folder_path}/pdfs/`
                     : "→ App data folder/pdfs/"}
@@ -198,7 +198,7 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
         {/* Project selector — only when creating new */}
         {!activePaper && (
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1">
+            <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
               Project
             </label>
             <select

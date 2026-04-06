@@ -210,7 +210,7 @@ function renderBullets(
         const delBtn = document.createElement("span");
         delBtn.textContent = "×";
         delBtn.style.cssText =
-          "cursor:pointer; font-size:14px; opacity:0.35; flex-shrink:0; line-height:1; color:var(--status-revisit);";
+          "cursor:pointer; font-size:1.077rem; opacity:0.35; flex-shrink:0; line-height:1; color:var(--status-revisit);";
         delBtn.title = "Remove this linked bullet";
         delBtn.addEventListener("mouseenter", () => { delBtn.style.opacity = "0.9"; });
         delBtn.addEventListener("mouseleave", () => { delBtn.style.opacity = "0.35"; });

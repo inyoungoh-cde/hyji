@@ -441,7 +441,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
 
     if (rects.length === 0) {
       // No rects: fall back to page outline
-      const fallbackColor = noteField === "questions" ? "#7209b7" : "#ff6b35";
+      const fallbackColor = noteField === "questions" ? "#a78bfa" : "#ff6b35";
       pageEl.style.outline = `3px solid ${fallbackColor}`;
       pageEl.style.outlineOffset = "4px";
       const t = setTimeout(() => {
@@ -524,7 +524,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-sm">
-          <div className="text-[32px] mb-3 opacity-30">⚠</div>
+          <div className="text-[2.462rem] mb-3 opacity-30">⚠</div>
           <div className="text-body text-text-secondary mb-2">Failed to load PDF</div>
           <div className="text-small text-text-tertiary font-mono break-all">{error}</div>
         </div>

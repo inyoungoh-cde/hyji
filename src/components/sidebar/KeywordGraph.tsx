@@ -196,10 +196,10 @@ export function KeywordGraph() {
     <div className="mt-2 relative">
       {keywordFilter && (
         <div className="flex items-center gap-1 mb-1">
-          <span className="text-[10px] text-accent truncate max-w-[120px]">{keywordFilter}</span>
+          <span className="text-caption text-accent truncate max-w-[120px]">{keywordFilter}</span>
           <button
             onClick={() => setKeywordFilter(null)}
-            className="text-[10px] text-text-tertiary hover:text-accent transition-colors"
+            className="text-caption text-text-tertiary hover:text-accent transition-colors"
           >
             ✕
           </button>

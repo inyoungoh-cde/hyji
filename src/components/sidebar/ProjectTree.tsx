@@ -308,10 +308,10 @@ export function ProjectTree({
           <div className={`w-3.5 h-3.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
             isSelected ? "bg-accent border-accent" : "border-border bg-bg-tertiary"
           }`}>
-            {isSelected && <span className="text-[8px] text-bg-primary font-bold leading-none">✓</span>}
+            {isSelected && <span className="text-nano text-bg-primary font-bold leading-none">✓</span>}
           </div>
         ) : (
-          <span className="text-[11px] flex-shrink-0">📄</span>
+          <span className="text-small flex-shrink-0">📄</span>
         )}
 
         {isEditingThis ? (
@@ -331,7 +331,7 @@ export function ProjectTree({
           <span className="truncate text-body flex-1 min-w-0">{paper.title}</span>
         )}
 
-        <span className={`text-[8px] flex-shrink-0 ${dotColor}`}>●</span>
+        <span className={`text-nano flex-shrink-0 ${dotColor}`}>●</span>
       </div>
     );
   };
@@ -455,10 +455,10 @@ export function ProjectTree({
                     }`}
                     onClick={(e) => { e.stopPropagation(); setSelectedProject(null); }}
                   >
-                    <span className="text-[10px] text-text-tertiary w-3">◉</span>
+                    <span className="text-caption text-text-tertiary w-3">◉</span>
                     <span>All Papers</span>
                     {row.count > 0 && (
-                      <span className="text-[10px] text-text-tertiary ml-auto">{row.count}</span>
+                      <span className="text-caption text-text-tertiary ml-auto">{row.count}</span>
                     )}
                   </div>
                 )}
@@ -496,10 +496,10 @@ export function ProjectTree({
                       }}
                       onContextMenu={(e) => handleProjectContextMenu(e, project.id)}
                     >
-                      <span className="text-[10px] text-text-tertiary w-3 flex-shrink-0">
+                      <span className="text-caption text-text-tertiary w-3 flex-shrink-0">
                         {hasPapersOrChildren ? (isCollapsed ? "▸" : "▾") : ""}
                       </span>
-                      <span className="text-[11px] flex-shrink-0">📁</span>
+                      <span className="text-small flex-shrink-0">📁</span>
                       {isEditing ? (
                         <input
                           ref={projectInputRef}
@@ -519,15 +519,15 @@ export function ProjectTree({
                             {project.name}
                           </span>
                           {project.folder_path && (
-                            <span className="ml-1 text-[9px] text-accent/60" title={project.folder_path}>📁</span>
+                            <span className="ml-1 text-micro text-accent/60" title={project.folder_path}>📁</span>
                           )}
                         </span>
                       )}
                       {paperCount > 0 && !isPDT && (
-                        <span className="text-[10px] text-text-tertiary flex-shrink-0 ml-1">{paperCount}</span>
+                        <span className="text-caption text-text-tertiary flex-shrink-0 ml-1">{paperCount}</span>
                       )}
                       {isPDT && (
-                        <span className="text-[10px] text-accent flex-shrink-0 ml-1">↓</span>
+                        <span className="text-caption text-accent flex-shrink-0 ml-1">↓</span>
                       )}
                     </div>
                   );
@@ -542,8 +542,8 @@ export function ProjectTree({
                       row.isDropTarget ? "bg-accent/10 border border-accent/40" : ""
                     }`}
                   >
-                    <span className="w-3 text-[10px] text-text-tertiary">—</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                    <span className="w-3 text-caption text-text-tertiary">—</span>
+                    <span className="text-caption font-bold uppercase tracking-wider text-text-tertiary">
                       {row.isDropTarget ? "Drop to unassign" : "Unassigned"}
                     </span>
                   </div>
@@ -612,7 +612,7 @@ export function ProjectTree({
           style={{ left: paperContextMenu.x, top: paperContextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+          <div className="px-3 py-1 text-caption font-bold uppercase tracking-wider text-text-tertiary">
             Move to
           </div>
           <button className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-text-secondary transition-colors"

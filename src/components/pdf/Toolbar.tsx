@@ -140,14 +140,14 @@ export function Toolbar({
         <button onClick={zoomIn} className="px-1.5 py-0.5 rounded text-body text-text-secondary hover:bg-bg-tertiary transition-colors">+</button>
         <button
           onClick={() => onScaleChange(1)}
-          className="px-2 py-0.5 rounded text-[10px] text-text-tertiary hover:bg-bg-tertiary transition-colors"
+          className="px-2 py-0.5 rounded text-caption text-text-tertiary hover:bg-bg-tertiary transition-colors"
           title="Original size (100%)"
         >
           1:1
         </button>
         <button
           onClick={onFitWidth}
-          className="px-2 py-0.5 rounded text-[10px] text-text-tertiary hover:bg-bg-tertiary transition-colors"
+          className="px-2 py-0.5 rounded text-caption text-text-tertiary hover:bg-bg-tertiary transition-colors"
           title="Fit to panel width (Ctrl+0)"
         >
           Fit
@@ -158,12 +158,12 @@ export function Toolbar({
 
       {/* Status + Importance badges (read-only) */}
       {status && (
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${statusColors[status] ?? ""}`}>
+        <span className={`px-1.5 py-0.5 rounded text-caption font-bold border ${statusColors[status] ?? ""}`}>
           {status === "Fully Reviewed" ? "Reviewed" : status === "Revisit Needed" ? "Revisit" : status}
         </span>
       )}
       {importance && (
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${importanceColors[importance] ?? ""}`}>
+        <span className={`px-1.5 py-0.5 rounded text-caption font-bold border ${importanceColors[importance] ?? ""}`}>
           {importanceShort[importance] ?? importance}
         </span>
       )}

@@ -229,13 +229,13 @@ function DeleteContextMenu({
         style={{ left: x, top: y, zIndex: 300, minWidth: 130, pointerEvents: "auto" }}
       >
         <button
-          className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--status-revisit)] hover:bg-bg-tertiary transition-colors"
+          className="w-full text-left px-3 py-1.5 text-small text-[var(--status-revisit)] hover:bg-bg-tertiary transition-colors"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
         >
           {label}
         </button>
         <button
-          className="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-bg-tertiary transition-colors"
+          className="w-full text-left px-3 py-1.5 text-small text-text-secondary hover:bg-bg-tertiary transition-colors"
           onClick={(e) => { e.stopPropagation(); onClose(); }}
         >
           Cancel
@@ -286,7 +286,7 @@ function MemoMarker({
         onContextMenu={handleContextMenu}
       >
         <span
-          className="text-[15px] transition-opacity"
+          className="text-[1.154rem] transition-opacity"
           style={{ opacity: hasMemo ? 0.85 : 0.4 }}
         >
           📝
@@ -300,7 +300,7 @@ function MemoMarker({
           onMouseLeave={() => setShowCtx(false)}
         >
           <button
-            className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--status-revisit)] hover:bg-bg-tertiary transition-colors"
+            className="w-full text-left px-3 py-1.5 text-small text-[var(--status-revisit)] hover:bg-bg-tertiary transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setShowCtx(false);
@@ -310,7 +310,7 @@ function MemoMarker({
             Delete memo
           </button>
           <button
-            className="w-full text-left px-3 py-1.5 text-[11px] text-text-secondary hover:bg-bg-tertiary transition-colors"
+            className="w-full text-left px-3 py-1.5 text-small text-text-secondary hover:bg-bg-tertiary transition-colors"
             onClick={() => setShowCtx(false)}
           >
             Cancel

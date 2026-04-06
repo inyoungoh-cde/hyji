@@ -71,6 +71,10 @@ pub fn run() {
                 .separator()
                 .text("dashboard", "Dashboard\tCtrl+H")
                 .text("keyword-graph", "Keyword Graph\tCtrl+G")
+                .separator()
+                .text("text-size-normal", "Text Size: Default")
+                .text("text-size-large",  "Text Size: Large")
+                .text("text-size-xlarge", "Text Size: X-Large")
                 .build()?;
 
             let tools_menu = SubmenuBuilder::new(app, "Tools")

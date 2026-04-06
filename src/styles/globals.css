@@ -30,7 +30,7 @@
 
   /* Link colors */
   --link-differentiation: #ff6b35;
-  --link-questions: #7209b7;
+  --link-questions: #a78bfa;
 }
 
 * {
@@ -38,6 +38,13 @@
   padding: 0;
   box-sizing: border-box;
 }
+
+html {
+  font-size: 13px; /* rem base — only change this to scale all text */
+}
+
+html.font-large  { font-size: 15px; }
+html.font-xlarge { font-size: 17px; }
 
 html,
 body,
@@ -47,7 +54,6 @@ body,
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
 }
 
 /* Scrollbar */

@@ -121,7 +121,7 @@ export function SmartPaste({ open, onClose, initialText = "" }: SmartPasteProps)
             />
           </div>
           {parsed?.rawBibtex && (
-            <div className="text-[10px] text-text-tertiary bg-bg-tertiary rounded px-2 py-1 font-mono max-h-[80px] overflow-y-auto selectable">
+            <div className="text-caption text-text-tertiary bg-bg-tertiary rounded px-2 py-1 font-mono max-h-[80px] overflow-y-auto selectable">
               {parsed.rawBibtex.slice(0, 200)}
               {parsed.rawBibtex.length > 200 && "..."}
             </div>
@@ -167,7 +167,7 @@ function PreviewField({
 }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1">
+      <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
         {label}
       </label>
       <input

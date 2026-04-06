@@ -103,7 +103,7 @@ export function PdfViewer() {
   const handleSendTo = useCallback(
     async (field: "differentiation" | "questions") => {
       if (!contextMenu || !activePaperId || !activePaper) return;
-      const color = field === "differentiation" ? "#ff6b35" : "#7209b7";
+      const color = field === "differentiation" ? "#ff6b35" : "#a78bfa";
 
       const annotation = await createAnnotation({
         paper_id: activePaperId,
@@ -420,7 +420,7 @@ export function PdfViewer() {
       {/* Tab bar */}
       <div className="flex items-center border-b border-border bg-bg-secondary shrink-0 px-1 py-0.5 gap-1">
         <div className="flex-1 flex items-center min-w-0 bg-bg-tertiary rounded px-2 py-1 gap-2">
-          <span className="text-[11px] text-text-tertiary flex-shrink-0">📄</span>
+          <span className="text-small text-text-tertiary flex-shrink-0">📄</span>
           {editingTabTitle ? (
             <input
               ref={tabTitleInputRef}
@@ -458,7 +458,7 @@ export function PdfViewer() {
           )}
           <button
             onClick={() => setActivePaper(null)}
-            className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0"
+            className="text-small text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0"
             title="Close (return to Dashboard)"
           >
             ✕
@@ -466,7 +466,7 @@ export function PdfViewer() {
         </div>
         <button
           onClick={() => setImportOpen(true)}
-          className="text-[13px] text-text-tertiary hover:text-accent transition-colors px-1.5 py-0.5 rounded hover:bg-bg-tertiary"
+          className="text-body text-text-tertiary hover:text-accent transition-colors px-1.5 py-0.5 rounded hover:bg-bg-tertiary"
           title="Import PDF"
         >
           ＋
@@ -584,7 +584,7 @@ export function PdfViewer() {
       ) : (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-[48px] mb-4 opacity-20">📄</div>
+            <div className="text-[3.692rem] mb-4 opacity-20">📄</div>
             <div className="text-body text-text-secondary">
               No PDF attached to this paper
             </div>
@@ -688,7 +688,7 @@ function ExtractMetaModal({
           rows={3}
           className="w-full bg-bg-tertiary border border-border rounded-[6px] px-3 py-2 text-body text-text-primary outline-none focus:border-accent/40 resize-none selectable"
         />
-        <p className="text-[10px] text-text-tertiary mt-1 mb-4">Ctrl+Enter to apply</p>
+        <p className="text-caption text-text-tertiary mt-1 mb-4">Ctrl+Enter to apply</p>
         <div className="flex gap-2 justify-end">
           <button
             onClick={onClose}

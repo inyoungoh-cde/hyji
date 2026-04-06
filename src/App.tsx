@@ -32,9 +32,19 @@ export default function App() {
     setTrackerWidth,
     toggleSidebar,
     toggleTracker,
+    textSize,
+    setTextSize,
   } = useUiStore();
 
-  // Menu events: toggle panels + modals
+  // Apply text size class to <html> element
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.remove("font-large", "font-xlarge");
+    if (textSize === "large")  html.classList.add("font-large");
+    if (textSize === "xlarge") html.classList.add("font-xlarge");
+  }, [textSize]);
+
+  // Menu events: toggle panels + modals + text size
   useEffect(() => {
     const unsubs = [
       onMenuEvent("toggle-sidebar", toggleSidebar),
@@ -42,11 +52,14 @@ export default function App() {
       onMenuEvent("about", () => setAboutOpen(true)),
       onMenuEvent("shortcuts", () => setShortcutsOpen(true)),
       onMenuEvent("github", () => shellOpen("https://github.com/inyoungoh-cde/hyji")),
+      onMenuEvent("text-size-normal", () => setTextSize("normal")),
+      onMenuEvent("text-size-large",  () => setTextSize("large")),
+      onMenuEvent("text-size-xlarge", () => setTextSize("xlarge")),
     ];
     return () => unsubs.forEach((fn) => fn());
-  }, [toggleSidebar, toggleTracker]);
+  }, [toggleSidebar, toggleTracker, setTextSize]);
 
-  // Ctrl+/ → keyboard shortcuts modal (fallback for menu shortcut)
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === "/") {

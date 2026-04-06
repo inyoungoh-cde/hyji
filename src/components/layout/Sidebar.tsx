@@ -92,13 +92,13 @@ export function Sidebar() {
               <span className="text-section font-bold uppercase tracking-wider text-text-tertiary group-hover:text-text-secondary transition-colors">
                 Keyword Graph
               </span>
-              <span className="text-[10px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+              <span className="text-caption text-text-tertiary group-hover:text-text-secondary transition-colors">
                 {graphVisible ? "▾" : "▸"}
               </span>
             </button>
             <button
               onClick={() => setGraphFullscreen(true)}
-              className="text-[11px] text-text-tertiary hover:text-accent transition-colors px-1 py-0.5 rounded hover:bg-bg-tertiary"
+              className="text-small text-text-tertiary hover:text-accent transition-colors px-1 py-0.5 rounded hover:bg-bg-tertiary"
               title="Expand full-screen"
             >
               ⤢

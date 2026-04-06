@@ -56,7 +56,7 @@ const IMPORTANCE_SHORT: Record<string, string> = {
 
 function Badge({ label, colorClass }: { label: string; colorClass: string }) {
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${colorClass}`}>
+    <span className={`inline-block px-1.5 py-0.5 rounded text-caption font-bold border ${colorClass}`}>
       {label}
     </span>
   );
@@ -132,7 +132,7 @@ function PaperCard({
               selected ? "bg-accent border-accent" : "border-border bg-bg-tertiary"
             }`}
           >
-            {selected && <span className="text-[9px] text-bg-primary font-bold leading-none">✓</span>}
+            {selected && <span className="text-micro text-bg-primary font-bold leading-none">✓</span>}
           </div>
         </div>
       )}
@@ -142,7 +142,7 @@ function PaperCard({
           {[paper.first_author || paper.authors, paper.year, paper.venue].filter(Boolean).join(" · ")}
         </div>
         {projectName && (
-          <div className="text-[10px] text-accent/70 mt-0.5 truncate">{projectName}</div>
+          <div className="text-caption text-accent/70 mt-0.5 truncate">{projectName}</div>
         )}
         <div className="flex gap-1 mt-1">
           <Badge label={paper.status} colorClass={statusColors[paper.status] ?? ""} />
@@ -396,7 +396,7 @@ export function PaperList() {
             Papers
           </span>
           {hasFilters && (
-            <span className="text-[10px] text-accent font-medium">
+            <span className="text-caption text-accent font-medium">
               {sortedPapers.length}/{papers.length}
             </span>
           )}
@@ -404,14 +404,14 @@ export function PaperList() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowSearch((s) => !s)}
-            className={`text-[12px] transition-colors ${showSearch ? "text-accent" : "text-text-tertiary hover:text-text-secondary"}`}
+            className={`text-section transition-colors ${showSearch ? "text-accent" : "text-text-tertiary hover:text-text-secondary"}`}
             title="Search papers (Ctrl+Shift+F)"
           >
             ⌕
           </button>
           <button
             onClick={toggleSelectMode}
-            className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
+            className={`text-caption font-bold uppercase tracking-wider px-1.5 py-0.5 rounded transition-colors ${
               selectMode ? "bg-accent text-bg-primary" : "text-text-tertiary hover:text-accent"
             }`}
             title="Select papers to export"
@@ -439,7 +439,7 @@ export function PaperList() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search title, authors, notes…"
-            className="w-full bg-bg-tertiary border border-border rounded-[6px] px-2 py-1 text-[11px] text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/40"
+            className="w-full bg-bg-tertiary border border-border rounded-[6px] px-2 py-1 text-small text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/40"
           />
         </div>
       )}
@@ -450,7 +450,7 @@ export function PaperList() {
           <button
             key={s}
             onClick={() => setStatusFilter((prev) => (prev === s ? null : s))}
-            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-caption font-bold border transition-colors ${
               statusFilter === s
                 ? statusColors[s]
                 : "bg-transparent text-text-tertiary border-border hover:border-accent/30 hover:text-text-secondary"
@@ -467,7 +467,7 @@ export function PaperList() {
           <button
             key={imp}
             onClick={() => setImportanceFilter((prev) => (prev === imp ? null : imp))}
-            className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+            className={`px-1.5 py-0.5 rounded text-caption font-bold border transition-colors ${
               importanceFilter === imp
                 ? importanceColors[imp]
                 : "bg-transparent text-text-tertiary border-border hover:border-accent/30 hover:text-text-secondary"
@@ -479,7 +479,7 @@ export function PaperList() {
         {hasFilters && (
           <button
             onClick={() => { setStatusFilter(null); setImportanceFilter(null); setVenueFilter(null); setSearchQuery(""); setKeywordFilter(null); }}
-            className="px-1.5 py-0.5 rounded text-[10px] border border-transparent text-text-tertiary hover:text-accent transition-colors"
+            className="px-1.5 py-0.5 rounded text-caption border border-transparent text-text-tertiary hover:text-accent transition-colors"
           >
             ✕ clear
           </button>
@@ -491,10 +491,10 @@ export function PaperList() {
         <div className="border-t border-border">
           <button
             onClick={() => setVenueOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
+            className="w-full flex items-center justify-between px-3 py-1.5 text-caption font-bold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
           >
             <span>Venues {venueFilter && <span className="text-accent normal-case font-medium">· {venueFilter}</span>}</span>
-            <span className="text-[9px]">{venueOpen ? "▲" : "▼"}</span>
+            <span className="text-micro">{venueOpen ? "▲" : "▼"}</span>
           </button>
           {venueOpen && (
             <div className="pb-1">
@@ -502,13 +502,13 @@ export function PaperList() {
                 <button
                   key={v}
                   onClick={() => setVenueFilter((prev) => (prev === v ? null : v))}
-                  className={`w-full text-left px-4 py-1 text-[11px] transition-colors ${
+                  className={`w-full text-left px-4 py-1 text-small transition-colors ${
                     venueFilter === v
                       ? "text-accent font-medium"
                       : "text-text-secondary hover:text-text-primary"
                   }`}
                 >
-                  {venueFilter === v && <span className="mr-1 text-[9px]">✓</span>}{v}
+                  {venueFilter === v && <span className="mr-1 text-micro">✓</span>}{v}
                 </button>
               ))}
             </div>
@@ -518,11 +518,11 @@ export function PaperList() {
 
       {/* Sort bar */}
       <div className="border-t border-border px-3 py-1.5 flex items-center gap-2">
-        <span className="text-[10px] text-text-tertiary font-bold uppercase tracking-wider">Sort</span>
+        <span className="text-caption text-text-tertiary font-bold uppercase tracking-wider">Sort</span>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortKey)}
-          className="text-[10px] bg-bg-tertiary text-text-secondary border border-border rounded px-1.5 py-0.5 outline-none focus:border-accent/40 cursor-pointer flex-1"
+          className="text-caption bg-bg-tertiary text-text-secondary border border-border rounded px-1.5 py-0.5 outline-none focus:border-accent/40 cursor-pointer flex-1"
         >
           <option value="manual">Manual</option>
           <option value="date_read">Date Read</option>
@@ -538,17 +538,17 @@ export function PaperList() {
         <div className="px-3 pb-2 flex items-center gap-2">
           <button
             onClick={() => setSelectedIds(new Set(sortedPapers.map((p) => p.id)))}
-            className="text-[10px] text-accent hover:opacity-80 transition-opacity"
+            className="text-caption text-accent hover:opacity-80 transition-opacity"
           >
             All
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="text-[10px] text-text-tertiary hover:text-text-secondary transition-colors"
+            className="text-caption text-text-tertiary hover:text-text-secondary transition-colors"
           >
             None
           </button>
-          <span className="text-[10px] text-text-tertiary ml-auto">{selectedIds.size} selected</span>
+          <span className="text-caption text-text-tertiary ml-auto">{selectedIds.size} selected</span>
         </div>
       )}
 
@@ -607,8 +607,8 @@ export function PaperList() {
               disabled={selectedIds.size === 0 || exporting}
               className="w-full flex items-center justify-between px-3 py-2 rounded-[6px] border border-border bg-bg-tertiary hover:border-accent/40 hover:bg-bg-tertiary/80 disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
             >
-              <span className="text-[11px] font-medium text-text-primary">{label}</span>
-              <span className="text-[10px] text-text-tertiary">{selectedIds.size} papers</span>
+              <span className="text-small font-medium text-text-primary">{label}</span>
+              <span className="text-caption text-text-tertiary">{selectedIds.size} papers</span>
             </button>
           ))}
         </div>
@@ -623,7 +623,7 @@ export function PaperList() {
         >
           {projects.length > 0 && (
             <>
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+              <div className="px-3 py-1 text-caption font-bold uppercase tracking-wider text-text-tertiary">
                 Move to
               </div>
               <button

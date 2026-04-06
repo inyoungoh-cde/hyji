@@ -47,12 +47,12 @@ export function AboutModal({ onClose }: Props) {
         />
 
         {/* App name */}
-        <div style={{ fontSize: 24, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>
+        <div style={{ fontSize: "1.846rem", fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>
           HYJI
         </div>
 
         {/* Tagline */}
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 18 }}>
+        <div style={{ fontSize: "1rem", color: "var(--text-secondary)", marginBottom: 18 }}>
           Highlight Your Journey of Insights
         </div>
 
@@ -60,12 +60,12 @@ export function AboutModal({ onClose }: Props) {
         <div style={{ width: "100%", height: 1, background: "#30363d", marginBottom: 16 }} />
 
         {/* Version */}
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 14 }}>
+        <div style={{ fontSize: "1rem", color: "var(--text-secondary)", marginBottom: 14 }}>
           Version {VERSION} ({BUILD_INFO})
         </div>
 
         {/* Description */}
-        <div style={{ fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.65, marginBottom: 20 }}>
+        <div style={{ fontSize: "0.923rem", color: "var(--text-tertiary)", lineHeight: 1.65, marginBottom: 20 }}>
           A free, open-source research hub for reading,<br />
           annotating, and tracking academic papers.<br />
           Built with Tauri + React + pdf.js
@@ -83,7 +83,7 @@ export function AboutModal({ onClose }: Props) {
             background: "rgba(88,166,255,0.15)",
             border: "1px solid rgba(88,166,255,0.25)",
             color: "#58a6ff",
-            fontSize: 13,
+            fontSize: "1rem",
             fontWeight: 500,
             cursor: "pointer",
             marginBottom: 20,
@@ -109,7 +109,7 @@ export function AboutModal({ onClose }: Props) {
         <div style={{
           display: "flex",
           gap: 20,
-          fontSize: 12,
+          fontSize: "0.923rem",
           color: "var(--text-tertiary)",
           marginBottom: 20,
         }}>

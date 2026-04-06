@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+export type TextSize = "normal" | "large" | "xlarge";
+
 interface UiState {
   sidebarWidth: number;
   trackerWidth: number;
@@ -9,6 +11,7 @@ interface UiState {
   selectedProjectId: string | null;
   keywordFilter: string | null;
   scrollToAnnotation: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null;
+  textSize: TextSize;
 
   setSidebarWidth: (w: number) => void;
   setTrackerWidth: (w: number) => void;
@@ -18,6 +21,7 @@ interface UiState {
   setSelectedProject: (id: string | null) => void;
   setKeywordFilter: (keyword: string | null) => void;
   setScrollToAnnotation: (req: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null) => void;
+  setTextSize: (size: TextSize) => void;
 }
 
 const SIDEBAR_DEFAULT = 200;
@@ -32,6 +36,14 @@ function loadNumber(key: string, fallback: number): number {
   }
 }
 
+function loadTextSize(): TextSize {
+  try {
+    const v = localStorage.getItem("hyji:text-size");
+    if (v === "large" || v === "xlarge") return v;
+  } catch { /* ignore */ }
+  return "normal";
+}
+
 export const useUiStore = create<UiState>((set) => ({
   sidebarWidth: loadNumber("hyji:sidebar-width", SIDEBAR_DEFAULT),
   trackerWidth: loadNumber("hyji:tracker-width", TRACKER_DEFAULT),
@@ -41,6 +53,7 @@ export const useUiStore = create<UiState>((set) => ({
   selectedProjectId: null,
   keywordFilter: null,
   scrollToAnnotation: null,
+  textSize: loadTextSize(),
 
   setSidebarWidth: (w) => {
     localStorage.setItem("hyji:sidebar-width", String(w));
@@ -56,4 +69,8 @@ export const useUiStore = create<UiState>((set) => ({
   setSelectedProject: (id) => set({ selectedProjectId: id }),
   setKeywordFilter: (keyword) => set({ keywordFilter: keyword }),
   setScrollToAnnotation: (req) => set({ scrollToAnnotation: req }),
+  setTextSize: (size) => {
+    localStorage.setItem("hyji:text-size", size);
+    set({ textSize: size });
+  },
 }));

@@ -126,7 +126,7 @@ export function TrackerPanel() {
 
         {/* QUESTIONS */}
         <div className="px-4 pt-5 pb-6 min-h-[160px]">
-          <h3 className="text-section font-bold uppercase tracking-wider mb-3 text-[#7209b7]">
+          <h3 className="text-section font-bold uppercase tracking-wider mb-3 text-[#a78bfa]">
             ? Questions
           </h3>
           <BulletEditor
@@ -145,15 +145,15 @@ export function TrackerPanel() {
       <div className="shrink-0 border-t border-border">
         <button
           onClick={() => setMetaOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2 text-caption font-bold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
           title="Toggle metadata (Ctrl+M)"
         >
           <span className="flex items-center gap-1.5">
-            <span className="text-[9px]">{metaOpen ? "▾" : "▸"}</span>
+            <span className="text-micro">{metaOpen ? "▾" : "▸"}</span>
             Metadata
           </span>
           {!metaOpen && (
-            <span className="text-[10px] font-normal normal-case tracking-normal text-text-tertiary truncate max-w-[140px]">
+            <span className="text-caption font-normal normal-case tracking-normal text-text-tertiary truncate max-w-[140px]">
               {activePaper.title.slice(0, 24)}{activePaper.title.length > 24 ? "…" : ""}
             </span>
           )}
@@ -165,7 +165,7 @@ export function TrackerPanel() {
             <input
               value={activePaper.title}
               onChange={(e) => handleChange("title", e.target.value)}
-              className="w-full bg-transparent text-[15px] font-semibold text-text-primary outline-none border-none mb-2 selectable"
+              className="w-full bg-transparent text-[1.154rem] font-semibold text-text-primary outline-none border-none mb-2 selectable"
               placeholder="Paper title"
             />
             {/* Authors */}
@@ -252,7 +252,7 @@ function FieldInput({
 }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1">
+      <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
         {label}
       </label>
       <input
@@ -278,7 +278,7 @@ function FieldSelect({
 }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1">
+      <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
         {label}
       </label>
       <select
@@ -327,14 +327,14 @@ function KeywordsSection({ paperId }: { paperId: string }) {
 
   return (
     <div className="mt-1">
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1.5">
+      <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1.5">
         Keywords
       </label>
       <div className="flex flex-wrap gap-1.5 items-center">
         {paperKeywords.map((kw) => (
           <span
             key={kw.id}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-small border ${
               kw.source === "manual"
                 ? "bg-accent/10 text-accent border-accent/30"
                 : "bg-bg-tertiary text-text-secondary border-border"
@@ -358,12 +358,12 @@ function KeywordsSection({ paperId }: { paperId: string }) {
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
             placeholder="keyword…"
-            className="bg-bg-tertiary text-[11px] text-text-primary rounded-full px-2.5 py-0.5 outline-none border border-accent/40 w-28 selectable"
+            className="bg-bg-tertiary text-small text-text-primary rounded-full px-2.5 py-0.5 outline-none border border-accent/40 w-28 selectable"
           />
         ) : (
           <button
             onClick={handleShowInput}
-            className="px-2 py-0.5 rounded-full text-[11px] border border-dashed border-border text-text-tertiary hover:border-accent/40 hover:text-accent transition-colors"
+            className="px-2 py-0.5 rounded-full text-small border border-dashed border-border text-text-tertiary hover:border-accent/40 hover:text-accent transition-colors"
           >
             + add
           </button>

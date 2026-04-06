@@ -77,7 +77,7 @@ function KeyBadge({ k }: { k: string }) {
         borderRadius: 4,
         background: "rgba(255,255,255,0.06)",
         border: "1px solid #30363d",
-        fontSize: 11,
+        fontSize: "0.846rem",
         fontFamily: "'SF Mono','Cascadia Code','Fira Code',monospace",
         color: "var(--text-secondary)",
         lineHeight: 1,
@@ -120,7 +120,7 @@ export function KeyboardShortcutsModal({ onClose }: Props) {
       >
         {/* Header */}
         <div style={{
-          fontSize: 16,
+          fontSize: "1.231rem",
           fontWeight: 600,
           color: "var(--text-primary)",
           marginBottom: 20,
@@ -135,7 +135,7 @@ export function KeyboardShortcutsModal({ onClose }: Props) {
             <div key={group.title} style={{ marginBottom: gi < GROUPS.length - 1 ? 20 : 0 }}>
               {/* Group title */}
               <div style={{
-                fontSize: 10,
+                fontSize: "0.769rem",
                 fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: "0.08em",
@@ -158,14 +158,14 @@ export function KeyboardShortcutsModal({ onClose }: Props) {
                     gap: 12,
                   }}
                 >
-                  <span style={{ fontSize: 13, color: "var(--text-secondary)", flexShrink: 1 }}>
+                  <span style={{ fontSize: "1rem", color: "var(--text-secondary)", flexShrink: 1 }}>
                     {row.label}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
                     {row.keys.map((k, i) => (
                       <span key={i} style={{ display: "flex", alignItems: "center", gap: 3 }}>
                         {i > 0 && (
-                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", margin: "0 1px" }}>+</span>
+                          <span style={{ fontSize: "0.769rem", color: "var(--text-tertiary)", margin: "0 1px" }}>+</span>
                         )}
                         <KeyBadge k={k} />
                       </span>
