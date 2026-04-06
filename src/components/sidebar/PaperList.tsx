@@ -179,10 +179,8 @@ export function PaperList() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [importanceFilter, setImportanceFilter] = useState<string | null>(null);
   const [venueFilter, setVenueFilter] = useState<string | null>(null);
-  const [taskFilter, setTaskFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("manual");
   const [venueOpen, setVenueOpen] = useState(false);
-  const [taskOpen, setTaskOpen] = useState(false);
 
   // Virtual scroll
   const ITEM_HEIGHT = 84;
@@ -220,9 +218,8 @@ export function PaperList() {
     ? new Set(allKeywords.filter((k) => k.keyword === keywordFilter).map((k) => k.paper_id))
     : null;
 
-  // Unique venues and tasks for filter chips (from project-filtered papers)
+  // Unique venues for filter chips (from project-filtered papers)
   const uniqueVenues = [...new Set(projectFiltered.map((p) => p.venue).filter(Boolean))].sort();
-  const uniqueTasks = [...new Set(projectFiltered.map((p) => p.task).filter(Boolean))].sort();
 
   // Search + status + importance + venue + task + keyword filter
   const filteredPapers = projectFiltered.filter((p) => {
@@ -230,7 +227,6 @@ export function PaperList() {
     if (statusFilter && p.status !== statusFilter) return false;
     if (importanceFilter && p.importance !== importanceFilter) return false;
     if (venueFilter && p.venue !== venueFilter) return false;
-    if (taskFilter && p.task !== taskFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const haystack = [p.title, p.authors, p.first_author, p.venue, p.summary, p.differentiation, p.questions]
@@ -387,7 +383,7 @@ export function PaperList() {
     } finally { setExporting(false); }
   };
 
-  const hasFilters = statusFilter || importanceFilter || venueFilter || taskFilter || searchQuery.trim() || keywordFilter;
+  const hasFilters = statusFilter || importanceFilter || venueFilter || searchQuery.trim() || keywordFilter;
 
   return (
     <div className="flex flex-col h-full">
@@ -482,7 +478,7 @@ export function PaperList() {
         ))}
         {hasFilters && (
           <button
-            onClick={() => { setStatusFilter(null); setImportanceFilter(null); setVenueFilter(null); setTaskFilter(null); setSearchQuery(""); setKeywordFilter(null); }}
+            onClick={() => { setStatusFilter(null); setImportanceFilter(null); setVenueFilter(null); setSearchQuery(""); setKeywordFilter(null); }}
             className="px-1.5 py-0.5 rounded text-[10px] border border-transparent text-text-tertiary hover:text-accent transition-colors"
           >
             ✕ clear
@@ -513,36 +509,6 @@ export function PaperList() {
                   }`}
                 >
                   {venueFilter === v && <span className="mr-1 text-[9px]">✓</span>}{v}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Collapsible Task filter */}
-      {uniqueTasks.length > 0 && (
-        <div className="border-t border-border">
-          <button
-            onClick={() => setTaskOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
-          >
-            <span>Tasks {taskFilter && <span className="text-accent normal-case font-medium">· {taskFilter}</span>}</span>
-            <span className="text-[9px]">{taskOpen ? "▲" : "▼"}</span>
-          </button>
-          {taskOpen && (
-            <div className="pb-1">
-              {uniqueTasks.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTaskFilter((prev) => (prev === t ? null : t))}
-                  className={`w-full text-left px-4 py-1 text-[11px] transition-colors ${
-                    taskFilter === t
-                      ? "text-accent font-medium"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {taskFilter === t && <span className="mr-1 text-[9px]">✓</span>}{t}
                 </button>
               ))}
             </div>

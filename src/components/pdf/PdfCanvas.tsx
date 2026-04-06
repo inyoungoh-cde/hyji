@@ -272,20 +272,28 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       };
 
       const annotationData = await page.getAnnotations();
+      const annotLayerViewport = viewport.clone({ dontFlip: true });
       const annotationLayer = new pdfjsLib.AnnotationLayer({
         div: annotationLayerDiv,
         accessibilityManager: null,
         annotationCanvasMap: null,
         annotationEditorUIManager: null,
         page,
-        viewport: viewport.clone({ dontFlip: true }),
+        viewport: annotLayerViewport,
+        structTreeLayer: null,
+        commentManager: null,
         linkService: linkService as any,
+        annotationStorage: null,
       });
       await annotationLayer.render({
+        div: annotationLayerDiv,
+        viewport: annotLayerViewport,
         annotations: annotationData,
+        page,
+        linkService: linkService as any,
         imageResourcesPath: "",
         renderForms: false,
-      });
+      } as any);
 
       // External links: open in system browser instead of WebView
       annotationLayerDiv.querySelectorAll("a[href]").forEach((a) => {
