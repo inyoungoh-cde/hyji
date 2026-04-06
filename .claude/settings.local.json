@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(npm --version)",
+      "Bash(where rustc:*)",
+      "Bash(where cargo:*)",
+      "Bash(where node:*)",
+      "Bash(where npm:*)",
+      "Bash(export PATH=\"$PATH:/c/Users/KIST_VIG/.cargo/bin:/c/Program Files/nodejs:/c/Users/KIST_VIG/AppData/Roaming/npm\")",
+      "Bash(cmd.exe /c \"rustc --version\")",
+      "Bash(cmd.exe /c \"node --version\")",
+      "Bash(cmd.exe /c \"npm --version\")",
+      "Bash(cmd.exe /c \"cargo --version\")",
+      "Bash(cmd.exe /c \"rustc --version && node --version && npm --version && cargo --version\" 2>&1)",
+      "Read(//c/Users/KIST_VIG/.cargo/**)",
+      "Read(//c/Users/KIST_VIG/**)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/KIST_VIG/AppData/Roaming/**)",
+      "Bash(npx --yes @tauri-apps/cli icon --help)",
+      "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\KIST_VIG\\\\Downloads\\\\DEANOH-main\\\\hyji && npx @tauri-apps/cli icon --help\" 2>&1)",
+      "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\KIST_VIG\\\\Downloads\\\\DEANOH-main\\\\hyji && node scripts\\\\gen-icons.js\" 2>&1)",
+      "Bash(gh pr:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(npx vite:*)",
+      "Bash(node_modules/.bin/vite build:*)",
+      "Bash(npm run:*)",
+      "Bash(node -e ':*)",
+      "Bash(npm install:*)",
+      "Bash(xargs grep:*)",
+      "Bash(magick --version)",
+      "Bash(convert --version)",
+      "Bash(npx --yes sharp-cli --version)",
+      "Bash(npx sharp-cli:*)",
+      "Bash(node -e \"const p = require\\('pdfjs-dist'\\); console.log\\(Object.keys\\(p\\).filter\\(k => k.toLowerCase\\(\\).includes\\('annot'\\)\\)\\)\")"
+    ]
+  }
+}
