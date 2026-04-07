@@ -101,12 +101,15 @@ async function runMigrations(db: Database): Promise<void> {
     `ALTER TABLE annotations ADD COLUMN memo_text TEXT DEFAULT ''`,
     `ALTER TABLE projects ADD COLUMN folder_path TEXT DEFAULT ''`,
     `ALTER TABLE papers ADD COLUMN link TEXT DEFAULT ''`,
+    // Deduplicate keywords then enforce uniqueness to prevent race-condition duplicates
+    `DELETE FROM keywords WHERE id NOT IN (SELECT MIN(id) FROM keywords GROUP BY paper_id, keyword)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_keywords_unique ON keywords(paper_id, keyword)`,
   ];
   for (const sql of migrations) {
     try {
       await db.execute(sql);
     } catch {
-      // column already exists — safe to ignore
+      // column/index already exists or no-op — safe to ignore
     }
   }
 }

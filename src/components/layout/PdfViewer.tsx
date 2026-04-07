@@ -167,14 +167,6 @@ export function PdfViewer() {
     [contextMenu, activePaperId, createAnnotation]
   );
 
-  // Auto-extract keywords when active paper or its key fields change.
-  // Watching activePaper?.title and pdf_path ensures re-extraction after title edits
-  // and after papers finish loading (activePaper goes null→object).
-  useEffect(() => {
-    if (!activePaper) return;
-    useKeywordsStore.getState().regenForPaper(activePaper);
-  }, [activePaperId, activePaper?.title, activePaper?.raw_bibtex, activePaper?.pdf_path]);
-
   // Reset after flash animation completes
   useEffect(() => {
     if (scrollToAnnotation !== null) {

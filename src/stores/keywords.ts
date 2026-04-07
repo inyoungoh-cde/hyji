@@ -42,7 +42,7 @@ export const useKeywordsStore = create<KeywordsState>((set, get) => ({
       const extracted = await extractBest(paper);
       for (const kw of extracted) {
         await db.execute(
-          "INSERT INTO keywords (paper_id, keyword, source) VALUES (?, ?, 'auto')",
+          "INSERT OR IGNORE INTO keywords (paper_id, keyword, source) VALUES (?, ?, 'auto')",
           [paper.id, kw]
         );
       }
@@ -64,7 +64,7 @@ export const useKeywordsStore = create<KeywordsState>((set, get) => ({
     const extracted = await extractBest(paper);
     for (const kw of extracted) {
       await db.execute(
-        "INSERT INTO keywords (paper_id, keyword, source) VALUES (?, ?, 'auto')",
+        "INSERT OR IGNORE INTO keywords (paper_id, keyword, source) VALUES (?, ?, 'auto')",
         [paper.id, kw]
       );
     }
