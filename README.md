@@ -121,6 +121,11 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v0.1.2 (Apr 2026)
+- Fixed keyword duplication on paper import (race condition between two concurrent keyword-extraction effects)
+- Fixed keyword graph nodes clumping at center after Regenerate Keywords
+- Added Import PDF icon button to Projects header for one-click access
+
 ### v0.1.1 (Apr 2026)
 - Improved Questions section color — more vivid violet for better readability
 - Added text size options (Default / Large / X-Large) in View menu
