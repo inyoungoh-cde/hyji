@@ -121,6 +121,19 @@ export function KeywordGraph() {
     const maxCount = Math.max(...nodes.map((n) => n.count));
     const rScale = d3.scaleSqrt().domain([1, Math.max(maxCount, 1)]).range([5, 13]);
 
+    // Pre-assign spread positions for nodes that have no prior coordinates.
+    // Without this, D3's jiggle() places all fresh nodes at ~(0,0) and
+    // forceCenter drags them to the canvas center as a clump before
+    // forceManyBody can push them apart.
+    nodes.forEach((d, i) => {
+      if (d.x === undefined || d.y === undefined) {
+        const angle = (i / nodes.length) * 2 * Math.PI;
+        const r = Math.min(W, H) * 0.32;
+        d.x = W / 2 + Math.cos(angle) * r;
+        d.y = H / 2 + Math.sin(angle) * r;
+      }
+    });
+
     const sim = d3.forceSimulation<GraphNode>(nodes)
       .force("link", d3.forceLink<GraphNode, GraphLink>(links)
         .id((d) => d.id).distance(40).strength(0.4))
