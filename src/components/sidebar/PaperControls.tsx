@@ -3,7 +3,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { usePapersStore } from "../../stores/papers";
 import { useUiStore } from "../../stores/ui";
-import { onMenuEvent, emitMenuEvent } from "../../lib/menuEvents";
+import { onMenuEvent } from "../../lib/menuEvents";
 import { generateBibTeX, papersToWordRefs, papersToCsv } from "../../lib/bibtex";
 import type { Paper } from "../../types";
 
@@ -56,10 +56,8 @@ export function PaperControls({
   selectedIds, onSelectAll, onSelectNone,
   searchQuery, onSearchQuery,
 }: PaperControlsProps) {
-  const { papers, createPaper, deletePaper } = usePapersStore();
+  const { papers, deletePaper } = usePapersStore();
   const setActivePaper = useUiStore((s) => s.setActivePaper);
-  const selectedProjectId = useUiStore((s) => s.selectedProjectId);
-
   const [showSearch, setShowSearch] = useState(false);
   const [exporting, setExporting] = useState(false);
   const exportingRef = useRef(exporting);
@@ -68,11 +66,6 @@ export function PaperControls({
   useEffect(() => { papersRef.current = papers; }, [papers]);
 
   const hasFilters = statusFilter || importanceFilter || searchQuery.trim();
-
-  const handleAddPaper = async () => {
-    const paper = await createPaper("Untitled Paper", selectedProjectId);
-    setActivePaper(paper.id);
-  };
 
   const doExport = async (
     content: (ps: Paper[]) => string,
@@ -161,26 +154,6 @@ export function PaperControls({
           >
             {selectMode ? "Done" : "Sel"}
           </button>
-          {!selectMode && (
-            <button
-              onClick={() => emitMenuEvent("import-pdf")}
-              className="text-text-tertiary hover:text-accent transition-colors"
-              title="Import PDF (Ctrl+O)"
-            >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2 11h9M6.5 2v7M6.5 9l-2.5-2.5M6.5 9l2.5-2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
-          {!selectMode && (
-            <button
-              onClick={handleAddPaper}
-              className="text-text-tertiary hover:text-accent text-body transition-colors"
-              title="New blank paper"
-            >
-              +
-            </button>
-          )}
         </div>
       </div>
 

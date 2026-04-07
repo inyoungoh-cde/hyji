@@ -5,7 +5,7 @@ import { usePapersStore } from "../../stores/papers";
 import { useUiStore } from "../../stores/ui";
 import { useDragReorder } from "../../hooks/useDragReorder";
 import { usePaperDrag, PAPER_DRAG_UNASSIGNED } from "../../hooks/usePaperDrag";
-import { onMenuEvent } from "../../lib/menuEvents";
+import { onMenuEvent, emitMenuEvent } from "../../lib/menuEvents";
 import type { Project, Paper } from "../../types";
 
 const IMPORTANCE_ORDER: Record<string, number> = { "Must-Cite": 0, "Potentially Relevant": 1, "Noted": 2 };
@@ -414,13 +414,29 @@ export function ProjectTree({
         <span className="text-section font-bold uppercase tracking-wider text-text-secondary">
           Projects
         </span>
-        <button
-          onClick={() => handleNewFolder(null)}
-          className="text-text-tertiary hover:text-accent text-body transition-colors"
-          title="New folder"
-        >
-          +
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleNewFolder(null)}
+            className="flex items-center gap-0.5 text-text-tertiary hover:text-accent transition-colors"
+            title="New folder"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 3.5C1 2.95 1.45 2.5 2 2.5h3l1 1.5h5c.55 0 1 .45 1 1v5c0 .55-.45 1-1 1H2c-.55 0-1-.45-1-1V3.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M6.5 6v3M5 7.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => emitMenuEvent("import-pdf")}
+            className="flex items-center gap-0.5 text-text-tertiary hover:text-accent transition-colors"
+            title="Import PDF (Ctrl+O)"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 1.5h5l3 3v7c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1v-9c0-.55.45-1 1-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M8 1.5v3h3" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M6.5 6v3M5 7.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Tree — virtualized scrollable */}
