@@ -13,7 +13,23 @@ export async function extractKeywordsFromPdf(pdfPath: string): Promise<string[]>
   if (!pdfPath) return [];
   try {
     const bytes = await readFile(pdfPath);
-    const doc = await pdfjsLib.getDocument({ data: bytes, cMapPacked: false }).promise;
+
+    // 1b. XMP metadata — search raw bytes BEFORE passing to pdfjs.
+    //     pdfjs transfers (detaches) the ArrayBuffer when loading, so we must
+    //     search the bytes first. Some publishers (Oxford Academic, Springer)
+    //     store keywords only in XMP, leaving the PDF info-dict /Keywords empty.
+    try {
+      // Keep a copy of the buffer for pdfjs (slice transfers ownership safely)
+      const rawText = new TextDecoder("latin1", { fatal: false }).decode(bytes);
+      const xmpMatch = rawText.match(/<pdf:Keywords[^>]*>([^<]{3,1000})<\/pdf:Keywords>/i);
+      if (xmpMatch?.[1]?.trim()) {
+        const parsed = parseKeywordString(xmpMatch[1].trim());
+        if (parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore */ }
+
+    // Pass a copy to pdfjs so the original bytes stay intact if needed later
+    const doc = await pdfjsLib.getDocument({ data: bytes.slice(), cMapPacked: false }).promise;
 
     // 1a. PDF info-dict Keywords field (most common format)
     const meta = await doc.getMetadata();
@@ -22,17 +38,6 @@ export async function extractKeywordsFromPdf(pdfPath: string): Promise<string[]>
       const parsed = parseKeywordString(metaKw);
       if (parsed.length > 0) return parsed;
     }
-
-    // 1b. XMP metadata pdf:Keywords (used by Oxford/Springer and others
-    //     that leave the info-dict Keywords field empty)
-    try {
-      const xmpKw = (meta.metadata as { get?: (k: string) => unknown } | null)
-        ?.get?.("pdf:Keywords") as string ?? "";
-      if (xmpKw.trim()) {
-        const parsed = parseKeywordString(xmpKw);
-        if (parsed.length > 0) return parsed;
-      }
-    } catch { /* XMP not present or API unavailable */ }
 
     // 2. First-page text — look for "Keywords:" section
     const page = await doc.getPage(1);
