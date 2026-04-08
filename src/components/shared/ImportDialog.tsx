@@ -3,6 +3,7 @@ import { Modal } from "./Modal";
 import { usePapersStore } from "../../stores/papers";
 import { useProjectsStore } from "../../stores/projects";
 import { useUiStore } from "../../stores/ui";
+import { useKeywordsStore } from "../../stores/keywords";
 import { extractPdfMeta } from "../../lib/pdfMeta";
 
 interface ImportDialogProps {
@@ -105,6 +106,11 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
     if (!filePath) return;
     const paper = await createPaper(title || "Untitled Paper", targetProjectId);
     await attachPdf(paper.id);
+    // autoExtractForPapers fires on createPaper (before pdf_path is set) and
+    // falls back to title-based extraction. Re-run now that pdf_path is attached
+    // so the real PDF keywords (from ARTICLE INFO / metadata) are stored instead.
+    const fresh = usePapersStore.getState().papers.find((p) => p.id === paper.id);
+    if (fresh) await useKeywordsStore.getState().regenForPaper(fresh);
   };
 
   const handleClose = () => {
