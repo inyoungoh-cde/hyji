@@ -2,6 +2,11 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [0.1.3] - 2026-04-08
+
+### Fixed
+- **XMP keyword extraction** — Keywords stored exclusively in XMP metadata (e.g. Oxford Academic / JCDE journals) were not extracted because pdfjs transfers (detaches) the raw `ArrayBuffer` to its worker thread on load, leaving the bytes empty for subsequent reads. Fixed by searching the raw PDF bytes for `<pdf:Keywords>` **before** passing them to pdfjs, and giving pdfjs a copy (`bytes.slice()`) so the original buffer remains intact.
+
 ## [0.1.2] - 2026-04-07
 
 ### Fixed

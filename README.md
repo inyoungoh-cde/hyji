@@ -121,6 +121,9 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v0.1.3 (Apr 2026)
+- Fixed XMP keyword extraction — keywords stored only in XMP metadata (Oxford Academic, JCDE journals) now correctly extracted; root cause was pdfjs detaching the ArrayBuffer before the XMP scan could run
+
 ### v0.1.2 (Apr 2026)
 - Fixed keyword duplication on paper import (race condition between two concurrent keyword-extraction effects)
 - Fixed keyword graph nodes clumping at center after Regenerate Keywords
