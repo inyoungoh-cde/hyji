@@ -149,20 +149,65 @@ export function KeywordGraphFullscreen({ onClose }: Props) {
     const maxCount = Math.max(...nodes.filter((n) => n.kind === "keyword").map((n) => n.count), 1);
     const rScale = d3.scaleSqrt().domain([1, maxCount]).range([10, 26]);
 
+    // --- Pre-placement so clusters start separated ---
+    // Build kw-id → paper-id map from kw-paper links (before simulation mutates source/target)
+    const kwToPaper = new Map<string, string>();
+    for (const l of links) {
+      if ((l as GraphLink).kind !== "kw-paper") continue;
+      const src = typeof l.source === "string" ? l.source : (l.source as GraphNode).id;
+      const tgt = typeof l.target === "string" ? l.target : (l.target as GraphNode).id;
+      if (src.startsWith("kw:")) kwToPaper.set(src, tgt);
+      else kwToPaper.set(tgt, src);
+    }
+
+    const paperNodes = nodes.filter((n) => n.kind === "paper");
+    const paperPos = new Map<string, { x: number; y: number }>();
+    const clusterR = Math.min(W, H) * 0.3;
+
+    // Place each paper node equally around a circle
+    paperNodes.forEach((d, i) => {
+      if (d.x === undefined || d.y === undefined) {
+        const angle = (i / Math.max(paperNodes.length, 1)) * 2 * Math.PI - Math.PI / 2;
+        d.x = W / 2 + Math.cos(angle) * clusterR;
+        d.y = H / 2 + Math.sin(angle) * clusterR;
+      }
+      paperPos.set(d.id, { x: d.x!, y: d.y! });
+    });
+
+    // Place each keyword node in a small circle around its paper node
+    nodes.filter((n) => n.kind === "keyword").forEach((d) => {
+      if (d.x !== undefined && d.y !== undefined) return;
+      const paperId = kwToPaper.get(d.id);
+      const center = paperId ? paperPos.get(paperId) : null;
+      if (center) {
+        const angle = Math.random() * 2 * Math.PI;
+        const dist = 50 + Math.random() * 60;
+        d.x = center.x + Math.cos(angle) * dist;
+        d.y = center.y + Math.sin(angle) * dist;
+      } else {
+        d.x = W / 2 + (Math.random() - 0.5) * 120;
+        d.y = H / 2 + (Math.random() - 0.5) * 120;
+      }
+    });
+    // -------------------------------------------------
+
     const sim = d3.forceSimulation<GraphNode>(nodes)
       .force(
         "link",
         d3.forceLink<GraphNode, GraphLink>(links)
           .id((d) => d.id)
-          .distance((l) => (l as GraphLink).kind === "kw-paper" ? 90 : 140)
-          .strength((l) => (l as GraphLink).kind === "kw-paper" ? 0.25 : 0.15)
+          .distance((l) => (l as GraphLink).kind === "kw-paper" ? 80 : 120)
+          .strength((l) => (l as GraphLink).kind === "kw-paper" ? 0.4 : 0.2)
       )
-      .force("charge", d3.forceManyBody().strength((d) => (d as GraphNode).kind === "paper" ? -200 : -120))
-      .force("center", d3.forceCenter(W / 2, H / 2))
+      // Strong repulsion for paper nodes keeps clusters apart
+      .force("charge", d3.forceManyBody().strength((d) => (d as GraphNode).kind === "paper" ? -600 : -150))
+      // Gentle center gravity — just enough to keep everything on screen
+      .force("x", d3.forceX(W / 2).strength(0.03))
+      .force("y", d3.forceY(H / 2).strength(0.03))
       .force(
         "collision",
         d3.forceCollide<GraphNode>().radius((d) =>
-          (d as GraphNode).kind === "paper" ? 50 : rScale((d as GraphNode).count) + 6
+          (d as GraphNode).kind === "paper" ? 60 : rScale((d as GraphNode).count) + 6
         )
       )
       .alphaDecay(0.025)
