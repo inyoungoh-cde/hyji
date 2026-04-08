@@ -3,7 +3,6 @@ import { Modal } from "./Modal";
 import { usePapersStore } from "../../stores/papers";
 import { useProjectsStore } from "../../stores/projects";
 import { useUiStore } from "../../stores/ui";
-import { useKeywordsStore } from "../../stores/keywords";
 import { extractPdfMeta } from "../../lib/pdfMeta";
 
 interface ImportDialogProps {
@@ -104,13 +103,29 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
 
   const handleCreateNew = async () => {
     if (!filePath) return;
-    const paper = await createPaper(title || "Untitled Paper", targetProjectId);
-    await attachPdf(paper.id);
-    // autoExtractForPapers fires on createPaper (before pdf_path is set) and
-    // falls back to title-based extraction. Re-run now that pdf_path is attached
-    // so the real PDF keywords (from ARTICLE INFO / metadata) are stored instead.
-    const fresh = usePapersStore.getState().papers.find((p) => p.id === paper.id);
-    if (fresh) await useKeywordsStore.getState().regenForPaper(fresh);
+
+    // Resolve final path first (copy if needed) so the paper record is created
+    // with pdf_path already set. This ensures autoExtractForPapers sees the path
+    // immediately and extracts from the PDF rather than falling back to the title.
+    let finalPath = filePath;
+    if (storageMode === "copy") {
+      try {
+        const { copyFile, mkdir } = await import("@tauri-apps/plugin-fs");
+        const { appDataDir, join } = await import("@tauri-apps/api/path");
+        const filename = filePath.split(/[/\\]/).pop() ?? "paper.pdf";
+        const baseDir = targetProject?.folder_path || (await appDataDir());
+        const pdfsDir = await join(baseDir, "pdfs");
+        await mkdir(pdfsDir, { recursive: true });
+        finalPath = await join(pdfsDir, filename);
+        await copyFile(filePath, finalPath);
+      } catch (err) {
+        console.error("Copy failed, falling back to link:", err);
+      }
+    }
+
+    const paper = await createPaper(title || "Untitled Paper", targetProjectId, finalPath, storageMode);
+    setActivePaper(paper.id);
+    handleClose();
   };
 
   const handleClose = () => {

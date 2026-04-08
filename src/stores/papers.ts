@@ -6,7 +6,7 @@ interface PapersState {
   papers: Paper[];
   loading: boolean;
   fetchPapers: (projectId?: string | null) => Promise<void>;
-  createPaper: (title: string, projectId?: string | null) => Promise<Paper>;
+  createPaper: (title: string, projectId?: string | null, pdfPath?: string, pdfStorage?: "copy" | "link") => Promise<Paper>;
   updatePaper: (id: string, fields: Partial<Paper>) => Promise<void>;
   deletePaper: (id: string) => Promise<void>;
   reorderPapers: (orderedIds: string[]) => Promise<void>;
@@ -25,15 +25,15 @@ export const usePapersStore = create<PapersState>((set, get) => ({
     set({ papers: rows, loading: false });
   },
 
-  createPaper: async (title, projectId = null) => {
+  createPaper: async (title, projectId = null, pdfPath = "", pdfStorage = "link") => {
     const db = await getDb();
     const maxRows = await db.select<[{ m: number | null }]>(
       "SELECT MAX(sort_order) as m FROM papers"
     );
     const nextOrder = (maxRows[0]?.m ?? -1) + 1;
     await db.execute(
-      "INSERT INTO papers (title, project_id, sort_order) VALUES (?, ?, ?)",
-      [title, projectId, nextOrder]
+      "INSERT INTO papers (title, project_id, sort_order, pdf_path, pdf_storage) VALUES (?, ?, ?, ?, ?)",
+      [title, projectId, nextOrder, pdfPath, pdfStorage]
     );
     const rows = await db.select<Paper[]>(
       "SELECT * FROM papers ORDER BY created_at DESC LIMIT 1"
