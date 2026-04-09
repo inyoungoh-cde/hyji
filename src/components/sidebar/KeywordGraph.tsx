@@ -47,11 +47,23 @@ export function KeywordGraph() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperIdKey]);
 
-  // Filter papers by selected project
-  const projectPaperIds = useMemo(() => {
-    if (!selectedProjectId) return null; // null = all papers
-    return new Set(papers.filter((p) => p.project_id === selectedProjectId).map((p) => p.id));
+  // Stable string key for papers in the current project scope.
+  // Derived from paper IDs only — content changes (e.g. editing notes) do NOT
+  // change this string, so the keyword graph won't re-render while typing.
+  const projectPaperIdStr = useMemo(() => {
+    if (!selectedProjectId) return null;
+    return papers
+      .filter((p) => p.project_id === selectedProjectId)
+      .map((p) => p.id)
+      .sort()
+      .join("\0");
   }, [papers, selectedProjectId]);
+
+  // Only rebuild the Set when the actual paper membership changes (string value check)
+  const projectPaperIds = useMemo(() => {
+    if (projectPaperIdStr === null) return null;
+    return new Set(projectPaperIdStr.split("\0"));
+  }, [projectPaperIdStr]);
 
   // Filter keywords to only those belonging to project papers
   const scopedKeywords = useMemo(() => {

@@ -2,6 +2,11 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [0.1.5] - 2026-04-09
+
+### Fixed
+- **Keyword graph shakes while typing notes** — Editing any note field (Summary, Differentiation, Questions) triggered `updatePaper` → `fetchPapers`, which produced a new `papers` array reference. This caused `projectPaperIds` to rebuild a new `Set`, invalidating the `scopedKeywords` → `nodes` memo chain and restarting the D3 simulation on every keystroke. Fixed by deriving a stable string key from paper IDs only; the Set (and everything downstream) now only rebuilds when papers are actually added, removed, or moved — not when their content changes.
+
 ## [0.1.4] - 2026-04-09
 
 ### Added

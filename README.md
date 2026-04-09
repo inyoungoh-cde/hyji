@@ -137,6 +137,9 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v0.1.5 (Apr 2026)
+- Fixed keyword graph shaking while typing in note fields (D3 simulation was restarting on every keystroke due to unstable memo dependencies)
+
 ### v0.1.4 (Apr 2026)
 - Auto context menu after text drag-select — no right-click needed
 - Menu clamped to viewport, selection cleared on dismiss
