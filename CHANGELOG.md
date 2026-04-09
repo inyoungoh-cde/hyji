@@ -5,7 +5,7 @@ All notable changes to HYJI will be documented in this file.
 ## [0.1.4] - 2026-04-09
 
 ### Added
-- **Auto context menu on text selection** — Dragging to select text in the PDF now shows the highlight/memo/send menu automatically (80 ms after mouse release), matching Adobe Reader's UX. Right-click still works as before.
+- **Auto context menu on text selection** — Dragging to select text in the PDF now shows the highlight/memo/send menu automatically (80 ms after mouse release). Right-click still works as before.
 - **Context menu viewport clamping** — Menu is repositioned so it never overflows the screen edge.
 - **Selection cleared on menu dismiss** — Clicking outside the context menu now also clears the text selection, consistent with native PDF reader behavior.
 

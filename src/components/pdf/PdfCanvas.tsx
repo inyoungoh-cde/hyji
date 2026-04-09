@@ -552,7 +552,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         pageIndex: page,
       }));
 
-    // Position the menu just below the last selection rect (Adobe-style),
+    // Position the menu just below the last selection rect,
     // falling back to the cursor position if no rects are available.
     const lastRect = clientRects[clientRects.length - 1];
     const menuX = lastRect ? lastRect.right : clientX;
@@ -578,7 +578,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       ref={containerRef}
       className="flex-1 overflow-y-auto bg-[#525659] hyji-pdf-scroll"
       onMouseUp={(e) => {
-        // Adobe-style: show context menu automatically after drag-select.
+        // Show context menu automatically after drag-select.
         // A tiny delay lets the browser finalize the selection before we read it.
         if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current);
         const { clientX, clientY } = e;

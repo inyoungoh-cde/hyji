@@ -138,7 +138,7 @@ Please keep PRs focused — one feature or fix per PR.
 ## Changelog
 
 ### v0.1.4 (Apr 2026)
-- Auto context menu after text drag-select (Adobe Reader style) — no right-click needed
+- Auto context menu after text drag-select — no right-click needed
 - Menu clamped to viewport, selection cleared on dismiss
 - Garbled keyword extraction fixed: hyphenated PDF titles and concatenated text no longer produce word-fragment keywords
 
