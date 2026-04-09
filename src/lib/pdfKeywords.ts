@@ -9,6 +9,30 @@ try {
   ).toString();
 } catch { /* ignore */ }
 
+// Common multi-syllable suffixes that, when found mid-keyword, betray a concatenation.
+// e.g. "turefinetuning" ends with "finetuning" with "ture" before it → garbled.
+const CONCAT_SUFFIXES = [
+  "understanding", "estimation", "recognition", "finetuning", "fine-tuning",
+  "detection", "segmentation", "reconstruction", "representation", "generation",
+  "localization", "completion", "prediction", "classification", "registration",
+];
+
+// Returns true when a keyword batch looks like garbled PDF text extraction:
+//   – a token is > 18 chars with no spaces (almost certainly two words merged), or
+//   – a token has no spaces but ends with a known multi-syllable word that has
+//     additional chars in front (e.g. "ture" + "finetuning").
+function looksGarbled(keywords: string[]): boolean {
+  for (const kw of keywords) {
+    if (kw.includes(" ")) continue; // multi-word phrases are fine
+    const lower = kw.toLowerCase();
+    if (lower.length > 18) return true;
+    for (const suffix of CONCAT_SUFFIXES) {
+      if (lower.endsWith(suffix) && lower.length > suffix.length) return true;
+    }
+  }
+  return false;
+}
+
 export async function extractKeywordsFromPdf(pdfPath: string): Promise<string[]> {
   if (!pdfPath) return [];
   try {
@@ -53,7 +77,10 @@ export async function extractKeywordsFromPdf(pdfPath: string): Promise<string[]>
     );
     if (kwMatch) {
       const parsed = parseKeywordString(kwMatch[1]);
-      if (parsed.length > 0) return parsed;
+      // Sanity check: reject batches that look like garbled concatenations.
+      // pdfjs sometimes drops word-spacing for certain PDFs, producing tokens like
+      // "spondenceunderstanding" or "turefinetuning" — clearly word fragments.
+      if (parsed.length > 0 && !looksGarbled(parsed)) return parsed;
     }
 
     return [];

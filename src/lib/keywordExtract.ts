@@ -7,7 +7,8 @@ const STOPWORDS = new Set([
   "single", "joint", "unified", "learning", "approach", "method", "framework",
   "model", "network", "system", "task", "paper", "work", "study", "analysis",
   "evaluation", "performance", "show", "propose", "present", "achieve",
-  "demonstrate", "improve", "state", "art",
+  "demonstrate", "improve", "improves", "improved", "improving", "state", "art",
+  "minimal", "minimum", "maximum", "better", "best", "good", "simple", "without",
 ]);
 
 // Remove parenthetical content: "3D Gaussian Splatting (3DGS)" → "3D Gaussian Splatting"
@@ -56,13 +57,21 @@ export function parseKeywordString(raw: string): string[] {
 export function extractFromTitle(title: string): string[] {
   if (!title) return [];
 
-  const cleaned = removeParentheticals(title);
+  const cleaned = removeParentheticals(title)
+    // Join hyphenated line-breaks: "CORRE- SPONDENCE" → "CORRESPONDENCE"
+    .replace(/-\s+/g, "");
+
   const words = cleaned
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
     .map((w) => w.replace(/^-+|-+$/g, ""))
     .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
+
+  // If any word is suspiciously long (> 18 chars with no spaces), the title
+  // was extracted from a PDF with missing word-spacing and is garbled.
+  // Return [] so the caller shows an empty graph rather than word fragments.
+  if (words.some((w) => w.length > 18)) return [];
 
   const seen = new Set<string>();
   const result: string[] = [];

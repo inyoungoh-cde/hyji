@@ -107,6 +107,22 @@ The built installer will be at `src-tauri/target/release/bundle/msi/`.
 
 ---
 
+## Known Issues & Tips
+
+### Keyword graph shows word fragments (e.g. `corre`, `turefinetuning`)
+
+**Cause:** Some PDFs encode the document title in the text layer without word spaces, or with line-break hyphens (e.g. `"CORRE- SPONDENCE…"`). HYJI extracts the title from this raw text, so the stored title can look like `MULTIVIEWEQUIVARIANCEIMPROVES3D CORRE- SPONDENCE…`. When keyword extraction falls back to the title, it produces word-fragment keywords.
+
+**Fix:**
+1. Open the paper in HYJI and edit the **Title** field in the Tracker panel (bottom, expand Metadata) to the correct title.
+2. Run **Tools → Regenerate Keywords**.
+
+**Prevention:** Use **Smart Paste** (`Ctrl+N`) to paste a BibTeX entry or citation string when importing a paper — this gives HYJI accurate metadata from the start and avoids relying on PDF text extraction.
+
+> See [#known-issues](https://github.com/inyoungoh-cde/hyji/issues?q=label%3Aknown-issue) on GitHub for the full list.
+
+---
+
 ## Contributing
 
 Issues and pull requests are welcome.
@@ -120,6 +136,11 @@ Please keep PRs focused — one feature or fix per PR.
 ---
 
 ## Changelog
+
+### v0.1.4 (Apr 2026)
+- Auto context menu after text drag-select (Adobe Reader style) — no right-click needed
+- Menu clamped to viewport, selection cleared on dismiss
+- Garbled keyword extraction fixed: hyphenated PDF titles and concatenated text no longer produce word-fragment keywords
 
 ### v0.1.3 (Apr 2026)
 - Fixed XMP keyword extraction — keywords stored only in XMP metadata (Oxford Academic, JCDE journals) now correctly extracted; root cause was pdfjs detaching the ArrayBuffer before the XMP scan could run

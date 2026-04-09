@@ -2,6 +2,18 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [0.1.4] - 2026-04-09
+
+### Added
+- **Auto context menu on text selection** — Dragging to select text in the PDF now shows the highlight/memo/send menu automatically (80 ms after mouse release), matching Adobe Reader's UX. Right-click still works as before.
+- **Context menu viewport clamping** — Menu is repositioned so it never overflows the screen edge.
+- **Selection cleared on menu dismiss** — Clicking outside the context menu now also clears the text selection, consistent with native PDF reader behavior.
+
+### Fixed
+- **Garbled keyword extraction from hyphenated PDF titles** — When a PDF's text layer encodes the title without word spaces or with line-break hyphens (e.g. "CORRE- SPONDENCE…"), `extractFromTitle` now joins hyphenated breaks before splitting and returns `[]` for any word longer than 18 chars, preventing word-fragment keywords like `corre`, `turefinetuning` from appearing in the graph.
+- **First-page keyword scan rejects concatenated text** — Added `looksGarbled()` validation to the first-page "Keywords:" regex match: if extracted tokens contain obvious word concatenations (token > 18 chars, or token ends with a known multi-syllable suffix with a prefix), the batch is discarded and falls through to the title fallback.
+- **Stopword list expanded** — Added `improves`, `improved`, `improving`, `minimal`, `minimum`, `maximum`, `better`, `best`, `good`, `simple`, `without` to reduce noise in title-based keyword extraction.
+
 ## [0.1.3] - 2026-04-08
 
 ### Fixed

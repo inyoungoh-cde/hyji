@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface PdfContextMenuState {
   x: number;
@@ -26,10 +26,23 @@ interface ContextMenuProps {
 
 export function ContextMenu({ state, onClose, onHighlight, onAddMemo, onSendTo, onCopy }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x: state.x, y: state.y });
+
+  // Clamp position so the menu stays within the viewport
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setPos({
+      x: Math.min(state.x, window.innerWidth - width - 8),
+      y: Math.min(state.y, window.innerHeight - height - 8),
+    });
+  }, [state.x, state.y]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
+        window.getSelection()?.removeAllRanges();
         onClose();
       }
     };
@@ -49,7 +62,7 @@ export function ContextMenu({ state, onClose, onHighlight, onAddMemo, onSendTo, 
     <div
       ref={ref}
       className="fixed z-[200] bg-bg-secondary border border-border rounded-[8px] py-1 shadow-xl min-w-[220px]"
-      style={{ left: state.x, top: state.y }}
+      style={{ left: pos.x, top: pos.y }}
     >
       <div className="px-3 py-1 text-caption text-text-tertiary truncate max-w-[250px]">
         "{state.selectedText.slice(0, 60)}{state.selectedText.length > 60 ? "\u2026" : ""}"

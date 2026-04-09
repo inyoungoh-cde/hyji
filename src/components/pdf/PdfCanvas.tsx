@@ -77,6 +77,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const renderedPages = useRef<Map<number, number>>(new Map()); // pageNum -> rendered scale
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());       // outer page wrapper (for observer, scroll, text queries)
   const renderRefs = useRef<Map<number, HTMLDivElement>>(new Map());     // inner div (for imperative canvas/textLayer rendering)
+  const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load document
   useEffect(() => {
@@ -520,6 +521,46 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     });
   }, [searchQuery, searchIndex, onSearchResults]);
 
+  // Shared logic: read current selection and fire onContextMenu.
+  // Used by both mouseup (auto-show) and right-click handlers.
+  const fireContextMenuFromSelection = useCallback((clientX: number, clientY: number) => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
+    const selectedText = selection.toString().trim();
+    if (!selectedText) return;
+
+    // Determine which page the selection falls on by checking which page element
+    // contains the selection's focus node.
+    let page = 1;
+    let pageEl: HTMLDivElement | null = null;
+    const focusNode = selection.focusNode;
+    for (const [num, el] of pageRefs.current) {
+      if (el.contains(focusNode)) { page = num; pageEl = el; break; }
+    }
+    if (!pageEl) return;
+
+    const range = selection.getRangeAt(0);
+    const clientRects = Array.from(range.getClientRects());
+    const pageRect = pageEl.getBoundingClientRect();
+    const rects: PdfRect[] = clientRects
+      .filter((r) => r.width > 0 && r.height > 0)
+      .map((r) => ({
+        x: (r.left - pageRect.left) / scale,
+        y: (r.top - pageRect.top) / scale,
+        w: r.width / scale,
+        h: r.height / scale,
+        pageIndex: page,
+      }));
+
+    // Position the menu just below the last selection rect (Adobe-style),
+    // falling back to the cursor position if no rects are available.
+    const lastRect = clientRects[clientRects.length - 1];
+    const menuX = lastRect ? lastRect.right : clientX;
+    const menuY = lastRect ? lastRect.bottom + 4 : clientY;
+
+    onContextMenu({ x: menuX, y: menuY, selectedText, page, rects });
+  }, [scale, onContextMenu]);
+
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -536,6 +577,15 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto bg-[#525659] hyji-pdf-scroll"
+      onMouseUp={(e) => {
+        // Adobe-style: show context menu automatically after drag-select.
+        // A tiny delay lets the browser finalize the selection before we read it.
+        if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current);
+        const { clientX, clientY } = e;
+        selectionTimerRef.current = setTimeout(() => {
+          fireContextMenuFromSelection(clientX, clientY);
+        }, 80);
+      }}
     >
         <div className="flex flex-col items-center gap-3 py-4 hyji-pdf-pages">
           {pages.map((p) => (
@@ -552,24 +602,9 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
-                const selection = window.getSelection();
-                if (!selection || selection.isCollapsed) return;
-                const selectedText = selection.toString().trim();
-                if (!selectedText) return;
-                const range = selection.getRangeAt(0);
-                const clientRects = Array.from(range.getClientRects());
-                const pageEl = pageRefs.current.get(p.pageNum)!;
-                const pageRect = pageEl.getBoundingClientRect();
-                const rects: PdfRect[] = clientRects
-                  .filter((r) => r.width > 0 && r.height > 0)
-                  .map((r) => ({
-                    x: (r.left - pageRect.left) / scale,
-                    y: (r.top - pageRect.top) / scale,
-                    w: r.width / scale,
-                    h: r.height / scale,
-                    pageIndex: p.pageNum,
-                  }));
-                onContextMenu({ x: e.clientX, y: e.clientY, selectedText, page: p.pageNum, rects });
+                // Cancel any pending mouseup-triggered menu; right-click takes priority.
+                if (selectionTimerRef.current) clearTimeout(selectionTimerRef.current);
+                fireContextMenuFromSelection(e.clientX, e.clientY);
               }}
             >
               {/* Imperative canvas + text layer rendered here */}
