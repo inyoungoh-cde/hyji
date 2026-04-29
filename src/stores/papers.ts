@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Paper } from "../types";
 import { getDb } from "../lib/db";
+import { markDbDirty } from "../lib/backup";
 
 interface PapersState {
   papers: Paper[];
@@ -40,6 +41,7 @@ export const usePapersStore = create<PapersState>((set, get) => ({
     );
     const paper = rows[0];
     await get().fetchPapers();
+    markDbDirty();
     return paper;
   },
 
@@ -64,12 +66,14 @@ export const usePapersStore = create<PapersState>((set, get) => ({
       values
     );
     await get().fetchPapers();
+    markDbDirty();
   },
 
   deletePaper: async (id) => {
     const db = await getDb();
     await db.execute("DELETE FROM papers WHERE id = ?", [id]);
     await get().fetchPapers();
+    markDbDirty();
   },
 
   reorderPapers: async (orderedIds) => {
@@ -81,5 +85,6 @@ export const usePapersStore = create<PapersState>((set, get) => ({
       ]);
     }
     await get().fetchPapers();
+    markDbDirty();
   },
 }));

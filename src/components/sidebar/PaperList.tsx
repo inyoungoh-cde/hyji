@@ -285,7 +285,7 @@ export function PaperList() {
         setSelectedIds(new Set());
       }),
       onMenuEvent("export-all-bib", () =>
-        doExport((ps) => ps.map(generateBibTeX).join("\n\n"), "references.bib", "BibTeX", "bib")
+        doExport((ps) => ps.map((p) => generateBibTeX(p)).join("\n\n"), "references.bib", "BibTeX", "bib")
       ),
       onMenuEvent("export-all-word", () =>
         doExport((ps) => papersToWordRefs(ps), "references.txt", "Text", "txt")
@@ -361,7 +361,7 @@ export function PaperList() {
     setExporting(true);
     try {
       const selected = papers.filter((p) => selectedIds.has(p.id));
-      await saveFile(selected.map(generateBibTeX).join("\n\n"), "references.bib", "BibTeX", "bib");
+      await saveFile(selected.map((p) => generateBibTeX(p)).join("\n\n"), "references.bib", "BibTeX", "bib");
     } finally { setExporting(false); }
   };
 

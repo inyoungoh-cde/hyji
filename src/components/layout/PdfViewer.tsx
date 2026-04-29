@@ -24,6 +24,7 @@ const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 
 export function PdfViewer() {
   const activePaperId = useUiStore((s) => s.activePaperId);
+  const focusMode = useUiStore((s) => s.focusMode);
   const scrollToAnnotation = useUiStore((s) => s.scrollToAnnotation);
   const setScrollToAnnotation = useUiStore((s) => s.setScrollToAnnotation);
   const papers = usePapersStore((s) => s.papers);
@@ -45,6 +46,7 @@ export function PdfViewer() {
   const [searchTotal, setSearchTotal] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [smartPasteOpen, setSmartPasteOpen] = useState(false);
+  const [smartPasteSeed, setSmartPasteSeed] = useState<string>("");
   const [importOpen, setImportOpen] = useState(false);
   const [droppedFile, setDroppedFile] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<PdfContextMenuState | null>(null);
@@ -175,9 +177,41 @@ export function PdfViewer() {
     }
   }, [scrollToAnnotation, setScrollToAnnotation]);
 
+  // Focus Mode toggle (reads latest scale via ref to avoid stale closure)
+  const scaleRef = useRef(scale);
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
+  const toggleFocusMode = useCallback(() => {
+    const ui = useUiStore.getState();
+    if (!ui.activePaperId) return; // dashboard
+    if (ui.focusMode) {
+      const snap = ui.exitFocusMode();
+      if (snap) setScale(snap.zoomLevel);
+    } else {
+      ui.enterFocusMode({
+        sidebarOpen: ui.sidebarVisible,
+        trackerOpen: ui.trackerVisible,
+        zoomLevel: scaleRef.current,
+      });
+      setTimeout(() => {
+        if (viewerRef.current && pageWidthRef.current) {
+          const w = viewerRef.current.clientWidth;
+          setScale(Math.max(0.25, Math.round((w / pageWidthRef.current) * 100) / 100));
+        }
+      }, 0);
+    }
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "l") {
+        e.preventDefault();
+        toggleFocusMode();
+      }
+      if (e.key === "Escape" && useUiStore.getState().focusMode) {
+        e.preventDefault();
+        toggleFocusMode();
+      }
       if (e.ctrlKey && e.key === "f") {
         e.preventDefault();
         setShowSearch((s) => !s);
@@ -256,6 +290,7 @@ export function PdfViewer() {
       onMenuEvent("smart-paste", () => setSmartPasteOpen(true)),
       onMenuEvent("import-pdf", () => setImportOpen(true)),
       onMenuEvent("find-pdf", () => setShowSearch((s) => !s)),
+      onMenuEvent("focus-mode", toggleFocusMode),
       onMenuEvent("regen-keywords", async () => {
         const id = useUiStore.getState().activePaperId;
         if (!id) return;
@@ -369,13 +404,26 @@ export function PdfViewer() {
     let unlisten: (() => void) | null = null;
     try {
       const win = getCurrentWindow();
-      win.onDragDropEvent((event) => {
-        if (event.payload.type === "drop") {
-          const paths = event.payload.paths;
-          const pdfPath = paths.find((p) => p.toLowerCase().endsWith(".pdf"));
-          if (pdfPath) {
-            setDroppedFile(pdfPath);
-            setImportOpen(true);
+      win.onDragDropEvent(async (event) => {
+        if (event.payload.type !== "drop") return;
+        const paths = event.payload.paths;
+
+        const pdfPath = paths.find((p) => p.toLowerCase().endsWith(".pdf"));
+        if (pdfPath) {
+          setDroppedFile(pdfPath);
+          setImportOpen(true);
+          return;
+        }
+
+        const risPath = paths.find((p) => p.toLowerCase().endsWith(".ris"));
+        if (risPath) {
+          try {
+            const { readTextFile } = await import("@tauri-apps/plugin-fs");
+            const text = await readTextFile(risPath);
+            setSmartPasteSeed(text);
+            setSmartPasteOpen(true);
+          } catch (e) {
+            console.error("Read RIS failed:", e);
           }
         }
       }).then((fn) => { unlisten = fn; })
@@ -393,7 +441,7 @@ export function PdfViewer() {
           onImportPdf={() => setImportOpen(true)}
           onSmartPaste={() => setSmartPasteOpen(true)}
         />
-        <SmartPaste open={smartPasteOpen} onClose={() => setSmartPasteOpen(false)} />
+        <SmartPaste open={smartPasteOpen} onClose={() => { setSmartPasteOpen(false); setSmartPasteSeed(""); }} initialText={smartPasteSeed} />
         <ImportDialog
           open={importOpen}
           onClose={() => { setImportOpen(false); setDroppedFile(null); }}
@@ -483,6 +531,8 @@ export function PdfViewer() {
           onToggleSearch={() => setShowSearch((s) => !s)}
           status={activePaper.status}
           importance={activePaper.importance}
+          focusMode={focusMode}
+          onToggleFocus={toggleFocusMode}
           onPrint={async () => {
             const imgs = await pdfCanvasRef.current?.getPrintImages();
             if (!imgs || imgs.length === 0) return;
@@ -590,7 +640,7 @@ export function PdfViewer() {
         </div>
       )}
 
-      <SmartPaste open={smartPasteOpen} onClose={() => setSmartPasteOpen(false)} />
+      <SmartPaste open={smartPasteOpen} onClose={() => { setSmartPasteOpen(false); setSmartPasteSeed(""); }} initialText={smartPasteSeed} />
       <ImportDialog
         open={importOpen}
         onClose={() => { setImportOpen(false); setDroppedFile(null); }}

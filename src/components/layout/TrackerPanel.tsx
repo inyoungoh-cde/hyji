@@ -6,7 +6,18 @@ import { useKeywordsStore } from "../../stores/keywords";
 import { BulletEditor } from "../tracker/BulletEditor";
 import { generateBibTeX } from "../../lib/bibtex";
 import { onMenuEvent } from "../../lib/menuEvents";
-import type { Paper, NoteLink } from "../../types";
+import type { Paper, NoteLink, RefType } from "../../types";
+import { REF_TYPE_LABELS } from "../../types";
+
+const REF_TYPE_OPTIONS: RefType[] = [
+  "article",
+  "inproceedings",
+  "book",
+  "inbook",
+  "phdthesis",
+  "mastersthesis",
+  "misc",
+];
 
 export function TrackerPanel() {
   const activePaperId = useUiStore((s) => s.activePaperId);
@@ -161,6 +172,21 @@ export function TrackerPanel() {
 
         {metaOpen && (
           <div className="px-4 pb-3 max-h-96 overflow-y-auto">
+            {/* Type */}
+            <div className="mb-2">
+              <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
+                Type
+              </label>
+              <select
+                value={activePaper.ref_type ?? "article"}
+                onChange={(e) => handleChange("ref_type", e.target.value as RefType)}
+                className="w-full bg-bg-tertiary text-body text-text-primary rounded px-2 py-1 outline-none border border-transparent focus:border-accent/40 transition-colors cursor-pointer"
+              >
+                {REF_TYPE_OPTIONS.map((rt) => (
+                  <option key={rt} value={rt}>{REF_TYPE_LABELS[rt]}</option>
+                ))}
+              </select>
+            </div>
             {/* Title */}
             <input
               value={activePaper.title}
@@ -186,6 +212,44 @@ export function TrackerPanel() {
                 label="Journal / Conf."
                 value={activePaper.venue}
                 onChange={(v) => handleChange("venue", v)}
+              />
+            </div>
+            {/* Publisher / Edition — for book / inbook */}
+            {(activePaper.ref_type === "book" || activePaper.ref_type === "inbook") && (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <FieldInput
+                  label="Publisher"
+                  value={activePaper.publisher ?? ""}
+                  onChange={(v) => handleChange("publisher", v)}
+                />
+                <FieldInput
+                  label="Edition"
+                  value={activePaper.edition ?? ""}
+                  onChange={(v) => handleChange("edition", v)}
+                />
+              </div>
+            )}
+            {/* Chapter — for inbook only */}
+            {activePaper.ref_type === "inbook" && (
+              <div className="mb-3">
+                <FieldInput
+                  label="Chapter"
+                  value={activePaper.chapter ?? ""}
+                  onChange={(v) => handleChange("chapter", v)}
+                />
+              </div>
+            )}
+            {/* Pages + DOI — always */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <FieldInput
+                label="Pages"
+                value={activePaper.pages ?? ""}
+                onChange={(v) => handleChange("pages", v)}
+              />
+              <FieldInput
+                label="DOI"
+                value={activePaper.doi ?? ""}
+                onChange={(v) => handleChange("doi", v)}
               />
             </div>
             {/* Status + Importance */}

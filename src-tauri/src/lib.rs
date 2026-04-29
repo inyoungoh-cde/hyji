@@ -1,7 +1,13 @@
+mod backup;
 mod commands;
 
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
+
+use backup::{
+    get_backup_config, get_backup_status, mark_db_dirty, set_backup_config,
+    spawn_backup_loop, trigger_manual_backup, BackupState,
+};
 
 pub struct PendingOpenFile(pub Mutex<Option<String>>);
 
@@ -37,8 +43,18 @@ pub fn run() {
             commands::update_paper,
             commands::delete_paper,
             take_pending_open_file,
+            get_backup_config,
+            set_backup_config,
+            get_backup_status,
+            mark_db_dirty,
+            trigger_manual_backup,
         ])
         .setup(|app| {
+            // Auto-backup state — load config from app data dir
+            let cfg = backup::load_config(&app.handle());
+            app.manage(BackupState::new(cfg));
+            spawn_backup_loop(app.handle().clone());
+
             let window = app.get_webview_window("main").unwrap();
             window.set_title("HYJI — Highlight Your Journey of Insights")?;
 
@@ -56,10 +72,11 @@ pub fn run() {
                 .text("import-pdf", "Import PDF...\tCtrl+O")
                 .text("smart-paste", "Smart Paste\tCtrl+N")
                 .separator()
-                .text("export-selection-mode", "Export Selection Mode")
-                .text("export-all-bib", "Export All (.bib)")
-                .text("export-all-word", "Export All (Word References)")
-                .text("export-all-csv", "Export All (CSV)")
+                .text("selection-mode", "Selection Mode\tCtrl+Shift+S")
+                .text("export-selected", "Export Selected...")
+                .text("export-all", "Export All...")
+                .separator()
+                .text("preferences", "Preferences...")
                 .separator()
                 .quit()
                 .build()?;
@@ -79,11 +96,14 @@ pub fn run() {
                 .text("toggle-sidebar", "Toggle Sidebar\tCtrl+B")
                 .text("toggle-tracker", "Toggle Tracker Panel\tCtrl+J")
                 .separator()
+                .text("focus-mode", "Focus Mode\tCtrl+L")
+                .separator()
                 .text("zoom-in", "Zoom In\tCtrl+=")
                 .text("zoom-out", "Zoom Out\tCtrl+-")
                 .text("fit-width", "Fit Width\tCtrl+0")
                 .separator()
                 .text("dashboard", "Dashboard\tCtrl+H")
+                .text("expand-metadata", "Expand Metadata\tCtrl+M")
                 .text("keyword-graph", "Keyword Graph\tCtrl+G")
                 .separator()
                 .text("text-size-normal", "Text Size: Default")
@@ -97,6 +117,8 @@ pub fn run() {
                 .separator()
                 .text("db-backup", "Database Backup...")
                 .text("db-restore", "Restore from Backup...")
+                .separator()
+                .text("preferences", "Preferences...")
                 .build()?;
 
             let help_menu = SubmenuBuilder::new(app, "Help")

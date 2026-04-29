@@ -1,4 +1,5 @@
-import type { Paper } from "../types";
+import type { Paper, RefType } from "../types";
+import { formatVenue, type VenueFormat } from "./venueMap";
 
 function sanitizeKey(text: string): string {
   return text
@@ -23,6 +24,7 @@ function escapeLatex(text: string): string {
 }
 
 // Heuristic: is the venue a journal (has "journal", "transactions", "review", etc.)?
+// Used only when ref_type is missing.
 function isJournal(venue: string): boolean {
   const lower = venue.toLowerCase();
   return (
@@ -35,58 +37,87 @@ function isJournal(venue: string): boolean {
   );
 }
 
-export function generateBibTeX(paper: Paper): string {
-  // Use raw_bibtex verbatim if available
+function inferRefType(paper: Paper): RefType {
+  if (paper.ref_type) return paper.ref_type;
+  return isJournal(paper.venue || "") ? "article" : "inproceedings";
+}
+
+export interface BibTeXOptions {
+  venueFormat?: VenueFormat;
+}
+
+export function generateBibTeX(paper: Paper, options: BibTeXOptions = {}): string {
   if (paper.raw_bibtex?.trim()) return paper.raw_bibtex.trim();
 
   const key = generateCiteKey(paper);
-  const venue = paper.venue?.trim() || "";
-  const entryType = isJournal(venue) ? "article" : "inproceedings";
+  const refType = inferRefType(paper);
+  const venueFormat = options.venueFormat ?? "full";
+  const venue = paper.venue ? formatVenue(paper.venue, venueFormat) : "";
 
   const fields: [string, string][] = [];
 
-  if (paper.title) fields.push(["title", `{${escapeLatex(paper.title)}}`]);
+  if (paper.title) fields.push(["title", escapeLatex(paper.title)]);
   if (paper.authors || paper.first_author) {
     fields.push(["author", escapeLatex(paper.authors || paper.first_author)]);
   }
   if (paper.year) fields.push(["year", String(paper.year)]);
 
-  if (entryType === "article") {
-    if (venue) fields.push(["journal", escapeLatex(venue)]);
-  } else {
-    if (venue) fields.push(["booktitle", escapeLatex(venue)]);
+  // Venue field varies by type
+  switch (refType) {
+    case "article":
+      if (venue) fields.push(["journal", escapeLatex(venue)]);
+      break;
+    case "inproceedings":
+      if (venue) fields.push(["booktitle", escapeLatex(venue)]);
+      break;
+    case "inbook":
+      if (venue) fields.push(["booktitle", escapeLatex(venue)]);
+      if (paper.chapter) fields.push(["chapter", escapeLatex(paper.chapter)]);
+      if (paper.publisher) fields.push(["publisher", escapeLatex(paper.publisher)]);
+      if (paper.edition) fields.push(["edition", escapeLatex(paper.edition)]);
+      break;
+    case "book":
+      if (paper.publisher) fields.push(["publisher", escapeLatex(paper.publisher)]);
+      if (paper.edition) fields.push(["edition", escapeLatex(paper.edition)]);
+      break;
+    case "phdthesis":
+    case "mastersthesis":
+      if (venue) fields.push(["school", escapeLatex(venue)]);
+      break;
+    case "misc":
+      if (venue) fields.push(["howpublished", escapeLatex(venue)]);
+      break;
   }
 
+  if (paper.pages) fields.push(["pages", paper.pages.replace(/-/g, "--")]);
+  if (paper.doi) fields.push(["doi", paper.doi]);
   if (paper.link) fields.push(["url", paper.link]);
 
-  const body = fields
-    .map(([k, v]) => `  ${k} = {${v}}`)
-    .join(",\n");
-
-  return `@${entryType}{${key},\n${body}\n}`;
+  const body = fields.map(([k, v]) => `  ${k} = {${v}}`).join(",\n");
+  return `@${refType}{${key},\n${body}\n}`;
 }
 
 export function papersToJson(papers: Paper[]): string {
   return JSON.stringify(papers, null, 2);
 }
 
-// Word-friendly numbered reference list
-// Format: [N] Authors, "Title," Venue, Year.
+// Word-friendly numbered reference list (legacy fallback — superseded by Export dialog)
 export function papersToWordRefs(papers: Paper[]): string {
   return papers
-    .map((p) => {
+    .map((p, i) => {
       const authors = p.authors || p.first_author || "Unknown Author";
       const title = p.title || "Untitled";
       const venue = p.venue || "";
       const year = p.year ? String(p.year) : "";
       const parts = [venue, year].filter(Boolean).join(", ");
-      return `[] ${authors}, "${title},"${parts ? " " + parts : ""}.`;
+      return `[${i + 1}] ${authors}, "${title},"${parts ? " " + parts : ""}.`;
     })
     .join("\n");
 }
 
 const CSV_FIELDS: (keyof Paper)[] = [
   "id", "title", "first_author", "authors", "year", "venue",
+  "ref_type", "publisher", "edition", "chapter", "pages", "doi",
   "status", "importance", "date_read", "link",
   "summary", "differentiation", "questions", "pdf_path",
   "created_at", "updated_at",

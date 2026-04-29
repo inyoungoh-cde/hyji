@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { getDb } from "../lib/db";
 import { extractKeywords } from "../lib/keywordExtract";
 import { extractKeywordsFromPdf } from "../lib/pdfKeywords";
+import { markDbDirty } from "./../lib/backup";
 import type { Keyword, Paper } from "../types";
 
 interface KeywordsState {
@@ -52,6 +53,7 @@ export const useKeywordsStore = create<KeywordsState>((set, get) => ({
     if (changed || rows.length === 0) {
       const updated = await db.select<Keyword[]>("SELECT * FROM keywords");
       set({ keywords: updated });
+      if (changed) markDbDirty();
     } else {
       set({ keywords: rows });
     }
@@ -69,6 +71,7 @@ export const useKeywordsStore = create<KeywordsState>((set, get) => ({
       );
     }
     await get().fetchKeywords();
+    markDbDirty();
   },
 
   addKeyword: async (paperId, keyword) => {
@@ -84,11 +87,13 @@ export const useKeywordsStore = create<KeywordsState>((set, get) => ({
       [paperId, trimmed]
     );
     await get().fetchKeywords();
+    markDbDirty();
   },
 
   removeKeyword: async (id) => {
     const db = await getDb();
     await db.execute("DELETE FROM keywords WHERE id = ?", [id]);
     await get().fetchKeywords();
+    markDbDirty();
   },
 }));

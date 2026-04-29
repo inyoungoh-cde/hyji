@@ -2,6 +2,20 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [0.1.7] - 2026-04-29
+
+### Added
+- **Export dialog with citation styles** — File → Export Selected… / Export All… opens a dialog where you pick output format (LaTeX `.bib`, Word references `.txt`, CSV, or Copy to clipboard), citation style (IEEE / ACS / Nature / APA / MLA), starting number (or no numbers), and journal-name format (full / abbr with dots / abbr no dots). Live preview updates as you change options.
+- **RIS import** — Smart Paste detects pasted RIS records (anything starting with `TY  -`); dragging a `.ris` file onto the window also opens Smart Paste pre-filled with the parsed entry. Maps TY/AU/TI/JO/PY/VL/IS/SP/EP/DO/PB/UR/KW/AB to HYJI fields.
+- **Reference types** — `papers` table gains `ref_type`, `publisher`, `edition`, `chapter`, `pages`, `doi`, `abstract_text`. The tracker metadata panel now has a Type dropdown (Article / Conference / Book / Book chapter / Thesis / Misc) and shows Publisher/Edition/Chapter conditionally. BibTeX export emits the matching `@article` / `@inproceedings` / `@book` / `@inbook` / `@phdthesis` / `@misc` and includes Pages/DOI fields.
+- **Venue/journal abbreviation mapping** — Replaced the inline 40-entry venue map with a 247-entry JSON dataset (`src/lib/venues.json`) covering ISO 4 / CASSI conventions. New `formatVenue(input, "full" | "abbr" | "abbr_nodots")` accepts any form (full, abbreviation, or short code) and returns the requested form. Imports normalize to the full name; exports format on the fly.
+- **Focus Mode** — `Ctrl+L` (or View → Focus Mode) hides the sidebar and tracker panel and applies Fit Width on the PDF. Toggle off with `Ctrl+L` again or `Esc`. A small `Focus` pill in the toolbar exits as well. Manually re-opening either panel auto-deactivates focus.
+- **Auto-backup** — File / Tools → Preferences… opens a settings dialog with auto-backup options: enable, folder, interval (5/10/30 min or 1 hour), only-on-change, keep last N. The Rust backend writes a `hyji_config.json` next to the database, runs a 60s ticker thread that copies the SQLite file to the backup folder when dirty + interval has elapsed, and rotates old backups.
+
+### Changed
+- **File menu restructure** — "Export Selection Mode" → "Selection Mode" (Ctrl+Shift+S); the three "Export All (.bib / Word / CSV)" items collapse into "Export Selected…" and "Export All…", both routed to the new export dialog. Added "Preferences…" above Exit (and a duplicate in Tools).
+- **View menu** — Added "Focus Mode" (Ctrl+L) and "Expand Metadata" (Ctrl+M) entries to match what the keyboard shortcuts already supported.
+
 ## [0.1.6] - 2026-04-29
 
 ### Added

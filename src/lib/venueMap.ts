@@ -1,66 +1,60 @@
-const VENUE_MAP: Record<string, string> = {
-  // Computer Vision
-  "proceedings of the ieee/cvf conference on computer vision and pattern recognition": "CVPR",
-  "ieee/cvf conference on computer vision and pattern recognition": "CVPR",
-  "computer vision and pattern recognition": "CVPR",
-  "proceedings of the ieee/cvf international conference on computer vision": "ICCV",
-  "ieee/cvf international conference on computer vision": "ICCV",
-  "international conference on computer vision": "ICCV",
-  "proceedings of the european conference on computer vision": "ECCV",
-  "european conference on computer vision": "ECCV",
-  // Machine Learning
-  "advances in neural information processing systems": "NeurIPS",
-  "neural information processing systems": "NeurIPS",
-  "proceedings of the international conference on machine learning": "ICML",
-  "international conference on machine learning": "ICML",
-  "proceedings of the international conference on learning representations": "ICLR",
-  "international conference on learning representations": "ICLR",
-  // AI
-  "proceedings of the aaai conference on artificial intelligence": "AAAI",
-  "aaai conference on artificial intelligence": "AAAI",
-  "proceedings of the international joint conference on artificial intelligence": "IJCAI",
-  // Robotics
-  "ieee international conference on robotics and automation": "ICRA",
-  "international conference on robotics and automation": "ICRA",
-  "ieee/rsj international conference on intelligent robots and systems": "IROS",
-  // NLP
-  "proceedings of the annual meeting of the association for computational linguistics": "ACL",
-  "association for computational linguistics": "ACL",
-  "proceedings of the conference on empirical methods in natural language processing": "EMNLP",
-  "empirical methods in natural language processing": "EMNLP",
-  "proceedings of the north american chapter of the association for computational linguistics": "NAACL",
-  // Journals
-  "ieee transactions on pattern analysis and machine intelligence": "TPAMI",
-  "international journal of computer vision": "IJCV",
-  "ieee transactions on image processing": "TIP",
-  "ieee transactions on neural networks and learning systems": "TNNLS",
-  "journal of machine learning research": "JMLR",
-  "nature": "Nature",
-  "science": "Science",
-  "the visual computer": "TVC",
-  "computer graphics forum": "CGF",
-  "acm transactions on graphics": "TOG",
-  "ieee transactions on visualization and computer graphics": "TVCG",
-  // Workshops / preprint
-  "arxiv preprint": "arXiv",
-  "arxiv": "arXiv",
-};
+import venuesData from "./venues.json";
 
+export type VenueFormat = "full" | "abbr" | "abbr_nodots" | "code";
+
+interface VenueEntry {
+  full: string;
+  abbr: string;
+  abbr_nodots: string;
+  code: string;
+}
+
+const venues = (venuesData as { venues: VenueEntry[] }).venues;
+
+const byFull = new Map<string, VenueEntry>();
+const byAbbr = new Map<string, VenueEntry>();
+const byAbbrNoDots = new Map<string, VenueEntry>();
+const byCode = new Map<string, VenueEntry>();
+
+for (const v of venues) {
+  byFull.set(v.full.toLowerCase(), v);
+  byAbbr.set(v.abbr.toLowerCase(), v);
+  byAbbrNoDots.set(v.abbr_nodots.toLowerCase(), v);
+  byCode.set(v.code.toLowerCase(), v);
+}
+
+function lookup(input: string): VenueEntry | null {
+  const key = input.toLowerCase().trim();
+  if (!key) return null;
+  return (
+    byFull.get(key) ||
+    byAbbr.get(key) ||
+    byAbbrNoDots.get(key) ||
+    byCode.get(key) ||
+    null
+  );
+}
+
+export function formatVenue(input: string, format: VenueFormat): string {
+  const entry = lookup(input);
+  if (!entry) return input.trim();
+  return entry[format];
+}
+
+export function normalizeVenue(input: string): string {
+  return formatVenue(input, "full");
+}
+
+// Backward-compatible: old callers want the short code when known,
+// otherwise pass the input through. Used by parser.ts.
 export function mapVenue(raw: string): string {
-  const lower = raw.toLowerCase().trim();
+  const entry = lookup(raw);
+  if (entry) return entry.code;
 
-  // Direct match
-  if (VENUE_MAP[lower]) return VENUE_MAP[lower];
-
-  // Partial match
-  for (const [key, short] of Object.entries(VENUE_MAP)) {
-    if (lower.includes(key)) return short;
+  // Partial substring match on the full name (legacy behavior)
+  const lower = raw.toLowerCase();
+  for (const [key, v] of byFull) {
+    if (lower.includes(key)) return v.code;
   }
-
-  // Already a short code
-  const upper = raw.trim().toUpperCase();
-  const knownShort = new Set(Object.values(VENUE_MAP).map((v) => v.toUpperCase()));
-  if (knownShort.has(upper)) return raw.trim();
-
   return raw.trim();
 }

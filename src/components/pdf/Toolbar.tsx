@@ -17,6 +17,8 @@ interface ToolbarProps {
   onToggleSearch: () => void;
   status?: string;
   importance?: string;
+  focusMode?: boolean;
+  onToggleFocus?: () => void;
   onPrint?: () => void;
   onSave?: () => void;
 }
@@ -56,6 +58,8 @@ export function Toolbar({
   onToggleSearch,
   status,
   importance,
+  focusMode,
+  onToggleFocus,
   onPrint,
   onSave,
 }: ToolbarProps) {
@@ -166,6 +170,16 @@ export function Toolbar({
         <span className={`px-1.5 py-0.5 rounded text-caption font-bold border ${importanceColors[importance] ?? ""}`}>
           {importanceShort[importance] ?? importance}
         </span>
+      )}
+
+      {focusMode && (
+        <button
+          onClick={onToggleFocus}
+          className="px-2 py-0.5 rounded-full text-caption font-medium border border-accent/40 bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+          title="Exit Focus Mode (Ctrl+L or Esc)"
+        >
+          Focus
+        </button>
       )}
 
       <div className="flex-1" />

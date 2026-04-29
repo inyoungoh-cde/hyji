@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Annotation, NoteLink } from "../types";
 import { getDb } from "../lib/db";
+import { markDbDirty } from "../lib/backup";
 
 interface AnnotationsState {
   annotations: Annotation[];
@@ -56,6 +57,7 @@ export const useAnnotationsStore = create<AnnotationsState>((set, get) => ({
       [ann.paper_id]
     );
     await get().fetchAnnotations(ann.paper_id);
+    markDbDirty();
     return rows[0];
   },
 
@@ -69,12 +71,14 @@ export const useAnnotationsStore = create<AnnotationsState>((set, get) => ({
     vals.push(id);
     await db.execute(`UPDATE annotations SET ${sets.join(", ")} WHERE id = ?`, vals);
     await get().fetchAnnotations(paperId);
+    markDbDirty();
   },
 
   deleteAnnotation: async (id, paperId) => {
     const db = await getDb();
     await db.execute("DELETE FROM annotations WHERE id = ?", [id]);
     await get().fetchAnnotations(paperId);
+    markDbDirty();
   },
 
   createNoteLink: async (link) => {
@@ -85,6 +89,7 @@ export const useAnnotationsStore = create<AnnotationsState>((set, get) => ({
       [link.paper_id, link.annotation_id, link.note_field, link.bullet_index]
     );
     await get().fetchAnnotations(link.paper_id);
+    markDbDirty();
   },
 
   getNoteLinksForPaper: async (paperId) => {
@@ -105,5 +110,6 @@ export const useAnnotationsStore = create<AnnotationsState>((set, get) => ({
       [link.paper_id, link.note_field, link.bullet_index]
     );
     await get().fetchAnnotations(link.paper_id);
+    markDbDirty();
   },
 }));

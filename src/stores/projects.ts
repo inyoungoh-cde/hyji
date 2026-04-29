@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Project } from "../types";
 import { getDb } from "../lib/db";
+import { markDbDirty } from "../lib/backup";
 
 interface ProjectsState {
   projects: Project[];
@@ -38,6 +39,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     );
     const project = rows[0];
     await get().fetchProjects();
+    markDbDirty();
     return project;
   },
 
@@ -48,12 +50,14 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       [name, id]
     );
     await get().fetchProjects();
+    markDbDirty();
   },
 
   deleteProject: async (id) => {
     const db = await getDb();
     await db.execute("DELETE FROM projects WHERE id = ?", [id]);
     await get().fetchProjects();
+    markDbDirty();
   },
 
   reorderProjects: async (orderedIds) => {
@@ -65,6 +69,7 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       ]);
     }
     await get().fetchProjects();
+    markDbDirty();
   },
 
   setProjectFolder: async (id, folderPath) => {
@@ -74,5 +79,6 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       [folderPath, id]
     );
     await get().fetchProjects();
+    markDbDirty();
   },
 }));

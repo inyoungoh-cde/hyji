@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { parseInput, type ParsedPaper } from "../../lib/parser";
 import { usePapersStore } from "../../stores/papers";
 import { useUiStore } from "../../stores/ui";
+import type { Paper } from "../../types";
 
 interface SmartPasteProps {
   open: boolean;
@@ -14,6 +15,16 @@ export function SmartPaste({ open, onClose, initialText = "" }: SmartPasteProps)
   const [input, setInput] = useState(initialText);
   const [parsed, setParsed] = useState<ParsedPaper | null>(null);
   const [step, setStep] = useState<"input" | "preview">("input");
+
+  // Refresh seed text whenever the modal is opened with a new initialText
+  // (e.g. .ris dropped onto the window).
+  useEffect(() => {
+    if (open && initialText) {
+      setInput(initialText);
+      setStep("input");
+      setParsed(null);
+    }
+  }, [open, initialText]);
   const createPaper = usePapersStore((s) => s.createPaper);
   const updatePaper = usePapersStore((s) => s.updatePaper);
   const activePaperId = useUiStore((s) => s.activePaperId);
@@ -31,14 +42,23 @@ export function SmartPaste({ open, onClose, initialText = "" }: SmartPasteProps)
 
   const applyToPaper = async (paperId: string) => {
     if (!parsed) return;
-    await updatePaper(paperId, {
+    const fields: Partial<Paper> = {
       title: parsed.title,
       authors: parsed.authors,
       first_author: parsed.firstAuthor,
       year: parsed.year,
       venue: parsed.venue,
       raw_bibtex: parsed.rawBibtex,
-    });
+      ref_type: parsed.refType,
+      publisher: parsed.publisher,
+      edition: parsed.edition,
+      chapter: parsed.chapter,
+      pages: parsed.pages,
+      doi: parsed.doi,
+      abstract_text: parsed.abstract,
+    };
+    if (parsed.link) fields.link = parsed.link;
+    await updatePaper(paperId, fields);
     setActivePaper(paperId);
     handleClose();
   };

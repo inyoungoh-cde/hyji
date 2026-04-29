@@ -137,6 +137,14 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v0.1.7 (Apr 2026)
+- New Export dialog: pick LaTeX `.bib` / Word `.txt` / CSV / Clipboard, citation style (IEEE / ACS / Nature / APA / MLA), starting number, and journal-name abbreviation format — with live preview
+- RIS import (drag a `.ris` file or paste RIS text into Smart Paste)
+- Reference types: article / conference / book / book chapter / thesis / misc with publisher, edition, chapter, pages, DOI fields; type-aware BibTeX export
+- Venue/journal abbreviation mapping expanded to 247 entries (ISO 4 / CASSI)
+- Focus Mode (Ctrl+L) — hides sidebar and tracker, fits PDF width; Esc or Ctrl+L exits
+- Auto-backup of the SQLite database with configurable folder, interval, "only on change", and keep-last-N rotation; configured in File → Preferences…
+
 ### v0.1.6 (Apr 2026)
 - PDF file association — set HYJI as the default `.pdf` handler in Windows and double-click any PDF to launch HYJI; the file is auto-imported as an unassigned paper, ready to read and annotate
 - Visible scrollbars — bumped from 6px/grey to 8px/white (40 %) across sidebar, tracker, PDF viewer, and popup menus

@@ -8,6 +8,25 @@ export interface Project {
   updated_at: string;
 }
 
+export type RefType =
+  | "article"
+  | "inproceedings"
+  | "book"
+  | "inbook"
+  | "phdthesis"
+  | "mastersthesis"
+  | "misc";
+
+export const REF_TYPE_LABELS: Record<RefType, string> = {
+  article: "Article",
+  inproceedings: "Conference",
+  book: "Book",
+  inbook: "Book chapter",
+  phdthesis: "PhD thesis",
+  mastersthesis: "Master's thesis",
+  misc: "Misc",
+};
+
 export interface Paper {
   id: string;
   project_id: string | null;
@@ -19,6 +38,13 @@ export interface Paper {
   venue: string;
   link: string;
   raw_bibtex: string;
+  ref_type: RefType;
+  publisher: string;
+  edition: string;
+  chapter: string;
+  pages: string;
+  doi: string;
+  abstract_text: string;
   status: "Surveyed" | "Fully Reviewed" | "Revisit Needed";
   importance: "Noted" | "Potentially Relevant" | "Must-Cite";
   date_read: string;

@@ -8,6 +8,7 @@ import { PdfViewer } from "./components/layout/PdfViewer";
 import { TrackerPanel } from "./components/layout/TrackerPanel";
 import { AboutModal } from "./components/shared/AboutModal";
 import { KeyboardShortcutsModal } from "./components/shared/KeyboardShortcutsModal";
+import { PreferencesDialog } from "./components/shared/PreferencesDialog";
 import { useUiStore } from "./stores/ui";
 import { usePapersStore } from "./stores/papers";
 import { emitMenuEvent, onMenuEvent } from "./lib/menuEvents";
@@ -25,6 +26,7 @@ function clamp(value: number, min: number, max: number): number {
 export default function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
 
   const {
     sidebarWidth,
@@ -54,6 +56,7 @@ export default function App() {
       onMenuEvent("toggle-tracker", toggleTracker),
       onMenuEvent("about", () => setAboutOpen(true)),
       onMenuEvent("shortcuts", () => setShortcutsOpen(true)),
+      onMenuEvent("preferences", () => setPreferencesOpen(true)),
       onMenuEvent("github", () => shellOpen("https://github.com/inyoungoh-cde/hyji")),
       onMenuEvent("text-size-normal", () => setTextSize("normal")),
       onMenuEvent("text-size-large",  () => setTextSize("large")),
@@ -156,6 +159,7 @@ export default function App() {
 
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {shortcutsOpen && <KeyboardShortcutsModal onClose={() => setShortcutsOpen(false)} />}
+      <PreferencesDialog open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
     </div>
   );
 }
