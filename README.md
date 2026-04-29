@@ -137,6 +137,11 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v0.1.6 (Apr 2026)
+- PDF file association — set HYJI as the default `.pdf` handler in Windows and double-click any PDF to launch HYJI; the file is auto-imported as an unassigned paper, ready to read and annotate
+- Visible scrollbars — bumped from 6px/grey to 8px/white (40 %) across sidebar, tracker, PDF viewer, and popup menus
+- Right-click "Move to" menu no longer gets cut off when there are many projects: scrolls when too tall, flips upward when near the window bottom
+
 ### v0.1.5 (Apr 2026)
 - Fixed keyword graph shaking while typing in note fields (D3 simulation was restarting on every keystroke due to unstable memo dependencies)
 

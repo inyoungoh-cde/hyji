@@ -2,6 +2,15 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [0.1.6] - 2026-04-29
+
+### Added
+- **PDF file association — open PDFs directly from Windows Explorer** — Setting HYJI as the default `.pdf` handler now works as expected: double-clicking any PDF launches HYJI and auto-imports the file as an unassigned paper. Backend stashes the launch-time argv path in a `PendingOpenFile` state; the frontend invokes `take_pending_open_file` on mount, runs `extractPdfMeta` for the title, and creates the paper with `project_id = null` so it lands under the existing **Unassigned** section. Drag it into a project folder later when you're ready.
+
+### Fixed
+- **Sidebar/menu scrollbars were nearly invisible** — Bumped the global scrollbar from 6px / `--border` color to 8px / 40 % white (60 % on hover, 4 px radius). Affects the project tree, tracker panel, PDF viewer, and every popup menu.
+- **Right-click "Move to" menu got cut off with many projects** — Both the project and paper context menus now apply `max-height: calc(100vh - 40px)` with `overflow-y: auto`, and a new `ClampedMenu` wrapper measures the menu after render and shifts it upward (and inward) so it never overflows the window edges. Mouse-wheel scrolling is contained to the menu (`overscroll-behavior: contain`).
+
 ## [0.1.5] - 2026-04-09
 
 ### Fixed
