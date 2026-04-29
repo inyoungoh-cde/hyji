@@ -1,10 +1,23 @@
 mod commands;
 
-use tauri::{Emitter, Manager};
+use std::sync::Mutex;
+use tauri::{Emitter, Manager, State};
+
+pub struct PendingOpenFile(pub Mutex<Option<String>>);
+
+#[tauri::command]
+fn take_pending_open_file(state: State<'_, PendingOpenFile>) -> Option<String> {
+    state.0.lock().ok().and_then(|mut g| g.take())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let pending_pdf = std::env::args()
+        .skip(1)
+        .find(|a| a.to_lowercase().ends_with(".pdf"));
+
     tauri::Builder::default()
+        .manage(PendingOpenFile(Mutex::new(pending_pdf)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -23,6 +36,7 @@ pub fn run() {
             commands::get_paper,
             commands::update_paper,
             commands::delete_paper,
+            take_pending_open_file,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

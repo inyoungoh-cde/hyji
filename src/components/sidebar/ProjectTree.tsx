@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useProjectsStore } from "../../stores/projects";
 import { usePapersStore } from "../../stores/papers";
@@ -573,9 +573,10 @@ export function ProjectTree({
 
       {/* Project context menu */}
       {projectContextMenu && (
-        <div
+        <ClampedMenu
+          x={projectContextMenu.x}
+          y={projectContextMenu.y}
           className="fixed z-50 bg-bg-secondary border border-border rounded-[8px] py-1 shadow-lg min-w-[160px]"
-          style={{ left: projectContextMenu.x, top: projectContextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
           <button className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-text-primary transition-colors"
@@ -608,7 +609,7 @@ export function ProjectTree({
               </button>
             </>
           )}
-        </div>
+        </ClampedMenu>
       )}
 
       {/* Paper drag ghost */}
@@ -623,9 +624,10 @@ export function ProjectTree({
 
       {/* Paper context menu */}
       {paperContextMenu && (
-        <div
+        <ClampedMenu
+          x={paperContextMenu.x}
+          y={paperContextMenu.y}
           className="fixed z-50 bg-bg-secondary border border-border rounded-[8px] py-1 shadow-lg min-w-[180px]"
-          style={{ left: paperContextMenu.x, top: paperContextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-1 text-caption font-bold uppercase tracking-wider text-text-tertiary">
@@ -654,8 +656,56 @@ export function ProjectTree({
             onClick={() => handleDeletePaper(paperContextMenu.paperId)}>
             Delete Paper
           </button>
-        </div>
+        </ClampedMenu>
       )}
+    </div>
+  );
+}
+
+function ClampedMenu({
+  x,
+  y,
+  children,
+  className,
+  onClick,
+}: {
+  x: number;
+  y: number;
+  children: React.ReactNode;
+  className?: string;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const margin = 8;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    const rect = el.getBoundingClientRect();
+    if (y + rect.height > window.innerHeight - margin) {
+      el.style.top = `${Math.max(margin, window.innerHeight - rect.height - margin)}px`;
+    }
+    if (x + rect.width > window.innerWidth - margin) {
+      el.style.left = `${Math.max(margin, window.innerWidth - rect.width - margin)}px`;
+    }
+  }, [x, y]);
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        left: x,
+        top: y,
+        maxHeight: "calc(100vh - 40px)",
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+      }}
+      onClick={onClick}
+    >
+      {children}
     </div>
   );
 }

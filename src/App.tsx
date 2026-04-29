@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Splitter } from "./components/layout/Splitter";
@@ -8,7 +9,9 @@ import { TrackerPanel } from "./components/layout/TrackerPanel";
 import { AboutModal } from "./components/shared/AboutModal";
 import { KeyboardShortcutsModal } from "./components/shared/KeyboardShortcutsModal";
 import { useUiStore } from "./stores/ui";
+import { usePapersStore } from "./stores/papers";
 import { emitMenuEvent, onMenuEvent } from "./lib/menuEvents";
+import { extractPdfMeta } from "./lib/pdfMeta";
 
 const SIDEBAR_MIN = 160;
 const SIDEBAR_MAX = 320;
@@ -88,6 +91,27 @@ export default function App() {
       cancelled = true;
       unlisten?.();
     };
+  }, []);
+
+  // PDF file association: if HYJI was launched with a .pdf path
+  // (e.g. double-clicked in Explorer), import it as an unassigned
+  // paper and open it. Runs once per launch.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const path = await invoke<string | null>("take_pending_open_file");
+        if (cancelled || !path) return;
+        const meta = await extractPdfMeta(path).catch(() => ({ title: "" }));
+        const filename = path.split(/[/\\]/).pop() ?? "Untitled";
+        const title = meta.title || filename.replace(/\.pdf$/i, "");
+        const paper = await usePapersStore.getState().createPaper(title, null, path, "link");
+        if (!cancelled) useUiStore.getState().setActivePaper(paper.id);
+      } catch (e) {
+        console.error("Failed to open associated PDF:", e);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const onSidebarResize = useCallback(
