@@ -191,6 +191,10 @@ function renderBullets(
     const isSub = text.startsWith("  ");
     const cleanText = isSub ? text.slice(2) : text;
 
+    // Skip visually empty bullets — keeps UI clean.
+    // Index i still maps correctly to note_link bullet_index.
+    if (!cleanText.trim()) return;
+
     const { div, textSpan } = makeBulletDiv(isSub);
     textSpan.textContent = (isSub ? "◦\u00A0" : "•\u00A0") + cleanText;
 

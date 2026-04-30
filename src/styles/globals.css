@@ -158,13 +158,15 @@ body {
   cursor: default;
 }
 
-/* Selection colors */
+/* Selection colors — kept very subtle to avoid the full-line bleed that occurs
+   when whitespace spans have large transform:scaleX values applied by pdf.js.
+   The actual stored highlight (SVG overlay) provides the real visual feedback. */
 .textLayer ::-moz-selection {
-  background: rgba(88, 166, 255, 0.4);
+  background: rgba(88, 166, 255, 0.12);
 }
 
 .textLayer ::selection {
-  background: rgba(88, 166, 255, 0.4);
+  background: rgba(88, 166, 255, 0.12);
   color: transparent;
 }
 
