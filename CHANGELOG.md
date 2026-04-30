@@ -8,8 +8,18 @@ All notable changes to HYJI will be documented in this file.
 
 - All features from v0.1.0 through v0.1.7 are now production-ready
 - New app icon with improved visibility at small sizes
-- PDF internal reference click with return-to-position and flash animation
+- PDF internal reference click with return-to-position and extended flash animation (3.5s)
 - Updated README with "Why HYJI?" section highlighting key differentiators
+
+### Fixed
+
+- **Highlight gaps at spaces** — Stored highlights now merge adjacent rects per line so word-gap spaces are filled, giving a clean continuous highlight instead of a striped appearance
+- **Empty bullet lines visible in note editors** — Blank lines in Summary, Differentiation, and Questions no longer render as visible empty rows; the stored index is preserved so linked bullets remain correctly anchored
+
+### Changed
+
+- **File menu** — Removed "Preferences…" from File menu; now only accessible via Tools menu
+- **Tools menu** — Added "Reset to Blank (Clear All Data)…" for wiping the database back to a blank state; Preferences moved to the very bottom of the menu
 
 ## [0.1.7] - 2026-04-29
 

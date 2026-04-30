@@ -162,8 +162,11 @@ Please keep PRs focused — one feature or fix per PR.
 ### v1.0.0 (Apr 2026)
 - Official release — all features from v0.1.x are now production-ready
 - New app icon with improved visibility at small sizes
-- PDF internal reference click with return-to-position and extended flash animation
-- Updated README with "Why HYJI?" section highlighting key differentiators
+- PDF internal reference click with return-to-position and extended flash animation (3.5s)
+- Stored highlights now fill word-gap spaces (no striped appearance)
+- Empty bullet lines in note editors no longer render as visible blank rows
+- Tools menu: added Reset to Blank (Clear All Data) and moved Preferences to the bottom
+- File menu: Preferences removed (accessible only via Tools)
 
 ### v0.1.7 (Apr 2026)
 - New Export dialog: pick LaTeX `.bib` / Word `.txt` / CSV / Clipboard, citation style (IEEE / ACS / Nature / APA / MLA), starting number, and journal-name abbreviation format — with live preview
