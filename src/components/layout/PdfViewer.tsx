@@ -696,7 +696,7 @@ export function PdfViewer() {
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-accent flex-shrink-0">
             <path d="M9 2L4 7l5 5" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <span className="text-small font-medium text-accent whitespace-nowrap">읽던 위치로</span>
+          <span className="text-small font-medium text-accent whitespace-nowrap">Back to reading</span>
           <button
             onClick={(e) => { e.stopPropagation(); setBackScrollTop(null); }}
             className="ml-1 text-text-tertiary hover:text-text-primary transition-colors leading-none text-body"
