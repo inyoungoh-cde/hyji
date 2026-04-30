@@ -166,13 +166,17 @@ body {
   cursor: default;
 }
 
-/* ::selection visible at moderate opacity. Whitespace spans with large
-   transform:scaleX may bleed slightly, but this is preferable to no
-   visual feedback during drag. */
+/* Normal selection colour for text spans */
 .textLayer ::-moz-selection  { background: rgba(88, 166, 255, 0.3); }
 .textLayer ::selection        { background: rgba(88, 166, 255, 0.3); color: transparent; }
 .textLayer br::-moz-selection { background: transparent; }
 .textLayer br::selection      { background: transparent; }
+
+/* Whitespace spans (marked by PdfCanvas after render) — suppress the
+   ::selection background so large scaleX values don't bleed across the line.
+   The span stays in the selection range so copy-paste still works. */
+.textLayer .pdfjs-space::-moz-selection { background: transparent !important; }
+.textLayer .pdfjs-space::selection      { background: transparent !important; }
 
 /* ==========================================================================
    PDF annotation layer — clickable links (URLs + internal references)

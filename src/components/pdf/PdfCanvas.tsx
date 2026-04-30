@@ -187,6 +187,20 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       });
       await textLayer.render();
 
+      // Mark whitespace-only spans so their ::selection background can be
+      // suppressed via CSS without removing them from the selection range
+      // (copy-paste still works). Two signals for a whitespace span:
+      //   1. textContent is empty after trim() — pure space character(s)
+      //   2. transform scaleX > 3 — a tiny character stretched to cover a gap
+      textLayerDiv.querySelectorAll<HTMLElement>("span").forEach((span) => {
+        if (span.textContent?.trim() === "") {
+          span.classList.add("pdfjs-space");
+          return;
+        }
+        const tx = new DOMMatrix(getComputedStyle(span).transform);
+        if (tx.a > 3) span.classList.add("pdfjs-space");
+      });
+
       // Create endOfContent div — required for drag-to-select across spans.
       const endOfContent = document.createElement("div");
       endOfContent.className = "endOfContent";
