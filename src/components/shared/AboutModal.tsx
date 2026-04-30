@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { open } from "@tauri-apps/plugin-shell";
 import iconUrl from "../../../src-tauri/icons/128x128.png";
 
-const VERSION = "0.1.7";
+const VERSION = "1.0.0";
 const BUILD_INFO = "Apr 2026 — Windows 64-bit";
 const GITHUB_URL = "https://github.com/inyoungoh-cde/hyji";
 

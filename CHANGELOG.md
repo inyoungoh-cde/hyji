@@ -2,6 +2,15 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.0] - 2026-04-30
+
+### Official Release
+
+- All features from v0.1.0 through v0.1.7 are now production-ready
+- New app icon: HJ ligature design with amber highlight bar
+- PDF internal reference click with return-to-position and flash animation
+- Updated README with "Why HYJI?" section highlighting key differentiators
+
 ## [0.1.7] - 2026-04-29
 
 ### Added
