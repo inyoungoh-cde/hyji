@@ -187,34 +187,24 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       });
       await textLayer.render();
 
-      // Mark whitespace-only spans so their ::selection background can be
-      // suppressed via CSS without removing them from the selection range
-      // (copy-paste still works). Three signals for a whitespace span:
-      //   1. textContent is empty after trim()
-      //   2. inline transform has scaleX > 2 (lowered from 3; this PDF's
-      //      space spans appear to have scaleX in the 2–3 range)
-      //   3. span width >> character count × font size (stretched filler)
-      textLayerDiv.querySelectorAll<HTMLElement>("span").forEach((span) => {
+      // Inverted strategy: mark ALL spans as pdfjs-space by default,
+      // then un-mark only confirmed word spans (non-whitespace + scaleX <= 1.5).
+      // More robust than trying to detect only bad spans — space span
+      // properties vary considerably across PDFs.
+      let _marked = 0, _kept = 0;
+      textLayerDiv.querySelectorAll("span").forEach((span) => {
         const text = span.textContent ?? "";
-        if (text.trim() === "") {
-          span.classList.add("pdfjs-space");
-          return;
-        }
-        // Parse scaleX directly from inline style (fastest; pdf.js sets it inline)
-        const inlineMatch = span.style.transform.match(/scaleX\(([^)]+)\)/);
-        const scaleX = inlineMatch ? parseFloat(inlineMatch[1]) : 1;
-        if (scaleX > 2) {
-          span.classList.add("pdfjs-space");
-          return;
-        }
-        // Fallback: span width is disproportionately large for its character count
-        // e.g. a 1-char span that's wider than 3× the font-size is likely a spacer
-        const fontSize = parseFloat(getComputedStyle(span).fontSize) || 12;
-        if (span.offsetWidth > fontSize * 3 * Math.max(1, text.length)) {
-          span.classList.add("pdfjs-space");
+        const m = span.style.transform.match(/scaleX\(([^)]+)\)/);
+        const scaleX = m ? parseFloat(m[1]) : 1;
+        if (text.trim().length > 0 && scaleX <= 1.5) {
+          _kept++; // leave normal selection highlight
+        } else {
+          (span as HTMLElement).classList.add("pdfjs-space");
+          _marked++;
         }
       });
-
+      // eslint-disable-next-line no-console
+      console.log("[hyji] page" + pageNum + ": " + _kept + " word, " + _marked + " space spans");
       // Create endOfContent div — required for drag-to-select across spans.
       const endOfContent = document.createElement("div");
       endOfContent.className = "endOfContent";
