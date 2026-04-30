@@ -1,6 +1,6 @@
 # HYJI — TODO List
 
-_Last updated: 2026-04-30 (v0.1.7)_
+_Last updated: 2026-04-30 (v1.0.0)_
 
 ---
 
@@ -48,6 +48,12 @@ _Last updated: 2026-04-30 (v0.1.7)_
 
 ## Known Issues
 
+- [ ] **::selection bleed at whitespace spans during drag**
+  - PDF.js text layer whitespace spans have large `transform:scaleX` values; the browser's `::selection` background renders at the transformed (scaled) size, causing brief bleed when the cursor crosses a space
+  - Partially mitigated: opacity set to 0.3; `clip-path:inset(0)` applied but WebView2 does not honour clip-path on `::selection`
+  - This is a structural limitation of DOM-based PDF text layers; Adobe Acrobat avoids it via native canvas rendering
+  - Stored highlights are clean (use `mergeToLineRects`); only the live drag preview is affected
+
 - [ ] **Highlight overlap in viewer**
   - SVG group opacity approach applied but visual overlap may persist in some edge cases
   - Adjacent span rects from `range.getClientRects()` can slightly overlap
@@ -60,6 +66,15 @@ _Last updated: 2026-04-30 (v0.1.7)_
 ---
 
 ## Completed (all sessions)
+
+### v1.0.0 (2026-04-30)
+- [x] Highlight gaps filled — `mergeToLineRects` merges same-line rects; stored highlights show as continuous bands
+- [x] Empty bullets hidden in BulletEditor — blank lines no longer render as visible rows
+- [x] Tools menu: Reset to Blank (Clear All Data) with double-confirm dialog
+- [x] Preferences moved to bottom of Tools menu; removed from File menu
+- [x] Internal link flash 3.5s + "Back to reading" floating button
+- [x] New app icon (HJ design, all sizes regenerated via sharp)
+- [x] Icon cache cleared; icon.rgba verified via preview PNG
 
 ### v0.1.7 (2026-04-29)
 - [x] Export dialog — format picker (LaTeX/Word/CSV/Clipboard), IEEE/ACS/Nature/APA/MLA citation styles, start-from, no-numbers, journal-name format (full/abbr/abbr_nodots), live preview

@@ -613,11 +613,19 @@ Help
 - [x] RIS import — `parseRis()` in parser.ts; Smart Paste detects `TY  -` prefix; drag-drop `.ris` file opens Smart Paste pre-filled
 - [x] Reference types — `ref_type` + publisher/edition/chapter/pages/doi/abstract_text columns; tracker Type dropdown; conditional Publisher/Edition/Chapter fields; type-aware BibTeX `@article/@inproceedings/@book/@inbook/@phdthesis/@misc`
 - [x] Venue/journal abbreviation mapping — 247-entry venues.json (ISO 4/CASSI); `formatVenue(input, 'full'|'abbr'|'abbr_nodots')`; imports normalize to full name; exports format on demand
-- [x] File menu restructure — Selection Mode (Ctrl+Shift+S), Export Selected…, Export All…, Preferences…
+- [x] File menu restructure — Selection Mode (Ctrl+Shift+S), Export Selected…, Export All… (Preferences moved to Tools only in v1.0.0)
 - [x] View menu additions — Focus Mode (Ctrl+L), Expand Metadata (Ctrl+M)
 - [x] Focus Mode (Ctrl+L) — saves panel state, hides sidebar+tracker, fits width; Esc/Ctrl+L exits; manual panel toggle auto-deactivates; toolbar Focus pill
 - [x] Auto-backup — Rust: BackupConfig (hyji_config.json), spawn_backup_loop (60s thread), perform_backup (file copy + rotation); frontend markDbDirty wired to all stores
 - [x] Preferences dialog — enable/folder/interval/only-on-change/keep-N controls; Backup now button; last backup timestamp + size display
+
+### Phase 1.3 — Polish + Bug Fixes (v1.0.0) ✅
+- [x] Highlight gaps filled — `mergeToLineRects` merges per-line rects so stored highlights show as continuous bands (no gaps at spaces)
+- [x] Empty bullets hidden — `BulletEditor.renderBullets` skips bullets with empty `cleanText`; index alignment for `note_links` preserved
+- [x] Tools menu: Reset to Blank (Clear All Data) — truncates all tables + reloads; double-confirm dialog
+- [x] Tools menu: Preferences moved to bottom; Reset above it; Preferences removed from File menu
+- [x] Internal link flash extended to 3.5s (was 2s); height increased to 28px for visibility
+- [x] "Back to reading" floating button after internal link navigation — `PdfCanvasHandle.scrollToY` + `onInternalNavigate` callback
 
 ---
 
