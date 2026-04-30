@@ -84,8 +84,6 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());       // outer page wrapper (for observer, scroll, text queries)
   const renderRefs = useRef<Map<number, HTMLDivElement>>(new Map());     // inner div (for imperative canvas/textLayer rendering)
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Live selection overlay — shows clean merged rects while the user drags
-  const [liveSelRects, setLiveSelRects] = useState<Array<{ left: number; top: number; width: number; height: number }>>([]);
 
   // Load document
   useEffect(() => {
@@ -538,28 +536,6 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     });
   }, [searchQuery, searchIndex, onSearchResults]);
 
-  // Live selection overlay — track the selection as the user drags and render
-  // clean merged-line rects instead of relying on ::selection CSS (which bleeds
-  // across transformed whitespace spans in the PDF text layer).
-  useEffect(() => {
-    const handleSelChange = () => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || !sel.rangeCount) {
-        setLiveSelRects([]);
-        return;
-      }
-      // Only react to selections within this PDF container
-      const range = sel.getRangeAt(0);
-      if (!containerRef.current?.contains(range.commonAncestorContainer)) {
-        setLiveSelRects([]);
-        return;
-      }
-      const merged = mergeToLineRects(Array.from(range.getClientRects()));
-      setLiveSelRects(merged);
-    };
-    document.addEventListener("selectionchange", handleSelChange);
-    return () => document.removeEventListener("selectionchange", handleSelChange);
-  }, []);
 
   // Shared logic: read current selection and fire onContextMenu.
   // Used by both mouseup (auto-show) and right-click handlers.
@@ -593,8 +569,6 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       pageIndex: page,
     }));
 
-    // Clear live overlay — the SVG annotation takes over
-    setLiveSelRects([]);
 
     // Position the menu just below the last selection rect
     const lastVP = mergedViewport[mergedViewport.length - 1];
@@ -630,27 +604,6 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         }, 80);
       }}
     >
-      {/* Live selection overlay — clean merged rects replace the CSS ::selection
-          bleed that occurs on whitespace spans with large scaleX transforms */}
-      {liveSelRects.length > 0 && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 9 }}>
-          {liveSelRects.map((r, i) => (
-            <div
-              key={i}
-              style={{
-                position: "fixed",
-                left: r.left,
-                top: r.top,
-                width: r.width,
-                height: r.height,
-                background: "rgba(88, 166, 255, 0.28)",
-                pointerEvents: "none",
-                borderRadius: "2px",
-              }}
-            />
-          ))}
-        </div>
-      )}
         <div className="flex flex-col items-center gap-3 py-4 hyji-pdf-pages">
           {pages.map((p) => (
             <div

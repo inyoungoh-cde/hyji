@@ -158,12 +158,12 @@ body {
   cursor: default;
 }
 
-/* ::selection is completely suppressed in the text layer.
-   Whitespace spans have large transform:scaleX values that cause the browser
-   selection background to bleed across the full line.
-   We render our own clean merged-line overlay (liveSelRects in PdfCanvas) instead. */
-.textLayer ::-moz-selection { background: transparent; }
-.textLayer ::selection       { background: transparent; color: transparent; }
+/* ::selection kept very subtle — whitespace spans have large transform:scaleX
+   that would bleed the full line at higher opacities. 0.08 gives a faint hint
+   without the jarring full-line flash. Gaps between words are filled by
+   mergeToLineRects when the annotation is stored. */
+.textLayer ::-moz-selection { background: rgba(88, 166, 255, 0.08); }
+.textLayer ::selection       { background: rgba(88, 166, 255, 0.08); color: transparent; }
 .textLayer br::-moz-selection { background: transparent; }
 .textLayer br::selection      { background: transparent; }
 

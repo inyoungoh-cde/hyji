@@ -116,9 +116,9 @@ pub fn run() {
                 .text("db-backup", "Database Backup...")
                 .text("db-restore", "Restore from Backup...")
                 .separator()
-                .text("preferences", "Preferences...")
-                .separator()
                 .text("clear-all-data", "Reset to Blank (Clear All Data)...")
+                .separator()
+                .text("preferences", "Preferences...")
                 .build()?;
 
             let help_menu = SubmenuBuilder::new(app, "Help")
