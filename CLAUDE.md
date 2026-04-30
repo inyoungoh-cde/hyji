@@ -34,12 +34,10 @@
 hyji/
 ├── src-tauri/          # Rust backend
 │   ├── src/
-│   │   ├── main.rs     # Tauri entry, window config
-│   │   ├── db.rs       # SQLite schema, migrations, queries
-│   │   ├── pdf.rs      # PDF file management (copy, path resolution)
-│   │   ├── export.rs   # BibTeX, JSON, CSV, Notion script generation
-│   │   └── commands.rs # Tauri IPC command handlers
-│   ├── migrations/     # SQL migration files
+│   │   ├── main.rs     # Tauri entry
+│   │   ├── lib.rs      # Builder setup, menu, PendingOpenFile, BackupState init
+│   │   ├── commands.rs # Tauri IPC command handlers (placeholder stubs)
+│   │   └── backup.rs   # Auto-backup: config R/W, perform_backup, spawn_backup_loop
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── src/                # React frontend
@@ -76,18 +74,23 @@ hyji/
 │   │   │   ├── NoteSection.tsx   # Summary / Differentiation / Questions
 │   │   │   └── LinkedBullet.tsx  # Bullet with PDF anchor link
 │   │   ├── shared/
-│   │   │   ├── SmartPaste.tsx    # BibTeX / citation / arXiv ID parser modal
+│   │   │   ├── SmartPaste.tsx       # BibTeX / citation / arXiv ID / RIS parser modal
+│   │   │   ├── ImportDialog.tsx     # PDF import dialog (copy/link, project selector)
+│   │   │   ├── ExportDialog.tsx     # Export dialog with citation styles + format options
+│   │   │   ├── PreferencesDialog.tsx # Auto-backup & settings dialog
+│   │   │   ├── AboutModal.tsx       # About HYJI modal
+│   │   │   ├── KeyboardShortcutsModal.tsx # Keyboard shortcuts reference modal
 │   │   │   ├── Badge.tsx
 │   │   │   ├── Modal.tsx
 │   │   │   └── Select.tsx
-│   │   └── export/
-│   │       ├── BibTexExport.tsx  # Select papers → export .bib
-│   │       └── NotionExport.tsx  # Generate Python script
 │   ├── lib/
-│   │   ├── parser.ts      # BibTeX / citation / arXiv ID parsing logic
-│   │   ├── bibtex.ts      # BibTeX generation from paper metadata
+│   │   ├── parser.ts      # BibTeX / citation / arXiv ID / RIS parsing logic
+│   │   ├── bibtex.ts      # Type-aware BibTeX generation from paper metadata
+│   │   ├── citations.ts   # Citation formatters: IEEE/ACS/Nature/APA/MLA
 │   │   ├── pdfMeta.ts     # Extract title/authors/abstract from PDF first page
-│   │   └── venueMap.ts    # Conference/journal name → abbreviation mapping
+│   │   ├── venueMap.ts    # 247-entry venue lookup (full/abbr/abbr_nodots/code)
+│   │   ├── venues.json    # Venue data file (ISO 4 / CASSI)
+│   │   └── backup.ts      # Frontend wrapper for backup Tauri commands
 │   ├── styles/
 │   │   └── globals.css    # Tailwind imports + custom CSS variables
 │   └── main.tsx
@@ -123,9 +126,16 @@ CREATE TABLE papers (
   first_author TEXT DEFAULT '',
   authors TEXT DEFAULT '',
   year INTEGER,
-  venue TEXT DEFAULT '',
+  venue TEXT DEFAULT '',           -- normalized to full name (via normalizeVenue)
   link TEXT DEFAULT '',            -- any URL (replaces code_link, task, input_modality)
   raw_bibtex TEXT DEFAULT '',      -- original BibTeX if pasted
+  ref_type TEXT DEFAULT 'article', -- article/inproceedings/book/inbook/phdthesis/mastersthesis/misc
+  publisher TEXT DEFAULT '',
+  edition TEXT DEFAULT '',
+  chapter TEXT DEFAULT '',
+  pages TEXT DEFAULT '',
+  doi TEXT DEFAULT '',
+  abstract_text TEXT DEFAULT '',
 
   -- Reading status
   status TEXT DEFAULT 'Surveyed' CHECK(status IN ('Surveyed','Fully Reviewed','Revisit Needed')),
@@ -328,14 +338,17 @@ Modal dialog, triggered by:
 - Button in sidebar or dashboard
 
 Accepts any of:
-- **BibTeX** (`@inproceedings{...}`) → parse all fields, store raw in `raw_bibtex`
+- **BibTeX** (`@inproceedings{...}`, `@book{...}`, etc.) → parse all fields, detect ref_type, store raw in `raw_bibtex`
+- **RIS** (text starting with `TY  -`) → parse TY/AU/TI/JO/PY/SP/EP/DO/PB/UR tags
 - **Citation string** (`Author, "Title." Venue. Year.`) → parse title, authors, year, venue
 - **arXiv ID** (`2403.18913`) → store as arXiv reference
 - **Plain title** → store as title only
 
+Drag-and-drop `.ris` file onto the window also opens Smart Paste pre-filled.
+
 After parsing, shows preview of detected fields → user clicks "Continue" → tracker panel opens with pre-filled fields.
 
-Venue mapping: long venue names (e.g. "Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition") auto-map to short codes (CVPR).
+Venue mapping: inputs are normalized to full venue name for DB storage (via `normalizeVenue`). On export, `formatVenue(venue, format)` converts to the user's chosen abbreviation style.
 
 ### 7. PDF import
 
@@ -472,13 +485,12 @@ File
 ├── Import PDF...             Ctrl+O
 ├── Smart Paste               Ctrl+N
 ├── ──────
-├── Export Selected as .bib   Ctrl+Shift+B
-├── Export All (JSON)
-├── Export All (CSV)
-├── Generate Notion Script
+├── Selection Mode            Ctrl+Shift+S
+├── Export Selected...        (disabled when nothing selected)
+├── Export All...
 ├── ──────
-├── Project Settings...
-└── Exit                      Alt+F4
+├── Preferences...
+└── Exit
 
 Edit
 ├── Undo                      Ctrl+Z
@@ -487,12 +499,14 @@ Edit
 ├── Find in PDF               Ctrl+F
 ├── Find Paper                Ctrl+Shift+F
 ├── ──────
-├── Select Mode (for .bib)    Ctrl+Shift+S
-└── Delete Paper              Delete
+├── Select Mode               Ctrl+Shift+S
+└── Delete Paper
 
 View
 ├── Toggle Sidebar            Ctrl+B
 ├── Toggle Tracker Panel      Ctrl+J
+├── ──────
+├── Focus Mode                Ctrl+L
 ├── ──────
 ├── Zoom In                   Ctrl+=
 ├── Zoom Out                  Ctrl+-
@@ -500,12 +514,19 @@ View
 ├── ──────
 ├── Dashboard                 Ctrl+H
 ├── Expand Metadata           Ctrl+M
-└── Keyword Graph (expand)    Ctrl+G
+├── Keyword Graph (expand)    Ctrl+G
+├── ──────
+├── Text Size: Default
+├── Text Size: Large
+└── Text Size: X-Large
 
 Tools
 ├── Extract PDF Metadata
 ├── Regenerate Keywords
-└── Database Backup...
+├── ──────
+├── Database Backup...
+├── Restore from Backup...
+└── Preferences...
 
 Help
 ├── Keyboard Shortcuts        Ctrl+/
@@ -564,20 +585,40 @@ Help
 - [x] Save highlights to PDF: pdf-lib burns highlight rects → save as new PDF
 - [x] F2 rename for both project folders and papers in sidebar
 
-### Phase 1.0 — Full Research Hub (partial)
+### Phase 1.0 — Full Research Hub ✅ (partial)
 - [x] Dashboard (Notion-style home): greeting, recent papers, stats, quick actions, project shortcuts
 - [x] Keyword extraction from PDF metadata + title
 - [x] Keyword graph in sidebar (D3 force layout)
 - [x] Click keyword → filter papers
 - [x] Manual keyword add/remove per paper
 - [x] Keyboard shortcuts for all major actions (Ctrl+F/N/O/H/G/B/J/M/+/-/0, Ctrl+Shift+F)
+- [x] Keyboard Shortcuts modal (Ctrl+/) — ShortcutsModal + KeyboardShortcutsModal
+- [x] About HYJI modal — AboutModal.tsx
+- [x] Project folder settings: right-click project → Set/Change/Clear PDF Folder
+- [x] Tauri auto-updater via GitHub releases — release.yml + tauri-plugin-updater
+- [x] Windows .msi installer — GitHub Actions produces signed .msi
+- [x] Performance: virtual scrolling for large paper lists — @tanstack/react-virtual in ProjectTree
 - [ ] Notion script generator
-- [ ] Keyboard Shortcuts modal (Ctrl+/)
-- [ ] About HYJI modal
-- [ ] Project folder settings: per-project storage location
-- [ ] Tauri auto-updater via GitHub releases
-- [ ] Windows .msi installer
-- [ ] Performance: virtual scrolling for large paper lists (100+ papers)
+
+### Phase 1.1 — Stability + File Association (v0.1.5–v0.1.6) ✅
+- [x] Scrollbar visibility — 8px white thumb (40 % / 60 % hover), transparent track
+- [x] PDF file association — `.pdf` registered in bundle; argv path stashed in PendingOpenFile; frontend invokes `take_pending_open_file` on mount, imports as unassigned paper
+- [x] UNASSIGNED section — papers with project_id=null shown at sidebar bottom; drag-to-project supported
+- [x] Context menu overflow fix — ClampedMenu wrapper: max-height calc(100vh-40px), overflow-y:auto, flips upward when near window bottom
+- [x] Keyword graph restart prevention — stable memo key derived from IDs only (v0.1.5)
+- [x] Auto context menu on text drag-select — 80ms after mouseup (v0.1.4)
+- [x] XMP keyword extraction before pdfjs ArrayBuffer detach (v0.1.3)
+
+### Phase 1.2 — Export, Import, Focus Mode, Backup (v0.1.7) ✅
+- [x] Export dialog — format picker (LaTeX/Word/CSV/Clipboard), citation style (IEEE/ACS/Nature/APA/MLA), start-from, no-numbers, journal-name format (full/abbr/abbr_nodots), live preview
+- [x] RIS import — `parseRis()` in parser.ts; Smart Paste detects `TY  -` prefix; drag-drop `.ris` file opens Smart Paste pre-filled
+- [x] Reference types — `ref_type` + publisher/edition/chapter/pages/doi/abstract_text columns; tracker Type dropdown; conditional Publisher/Edition/Chapter fields; type-aware BibTeX `@article/@inproceedings/@book/@inbook/@phdthesis/@misc`
+- [x] Venue/journal abbreviation mapping — 247-entry venues.json (ISO 4/CASSI); `formatVenue(input, 'full'|'abbr'|'abbr_nodots')`; imports normalize to full name; exports format on demand
+- [x] File menu restructure — Selection Mode (Ctrl+Shift+S), Export Selected…, Export All…, Preferences…
+- [x] View menu additions — Focus Mode (Ctrl+L), Expand Metadata (Ctrl+M)
+- [x] Focus Mode (Ctrl+L) — saves panel state, hides sidebar+tracker, fits width; Esc/Ctrl+L exits; manual panel toggle auto-deactivates; toolbar Focus pill
+- [x] Auto-backup — Rust: BackupConfig (hyji_config.json), spawn_backup_loop (60s thread), perform_backup (file copy + rotation); frontend markDbDirty wired to all stores
+- [x] Preferences dialog — enable/folder/interval/only-on-change/keep-N controls; Backup now button; last backup timestamp + size display
 
 ---
 
@@ -639,6 +680,6 @@ What to ship per release:
 - No cloud sync (purely local)
 - No collaborative editing
 - No mobile version
-- No citation style formatting (just raw BibTeX)
+- ~~No citation style formatting~~ — **implemented in v0.1.7** (IEEE/ACS/Nature/APA/MLA via Export dialog)
 - No PDF editing (no form fill, no page manipulation)
 - No web scraping (no auto-download from arXiv/Semantic Scholar)
