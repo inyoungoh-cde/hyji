@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "gen-icons": "node scripts/gen-icons.cjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.23",

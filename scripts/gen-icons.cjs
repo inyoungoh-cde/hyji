@@ -1,124 +1,119 @@
-// Generates minimal PNG and ICO icon files for Tauri build
-const fs = require("fs");
+/**
+ * gen-icons.cjs — Generate all HYJI icon assets from src-tauri/icons/icon.png
+ *
+ * Required outputs (Tauri v2 Windows + Rust window icon):
+ *   32x32.png          tauri.conf.json icon array
+ *   128x128.png        tauri.conf.json icon array
+ *   128x128@2x.png     tauri.conf.json icon array (256×256 pixels)
+ *   icon.ico           tauri.conf.json icon array (multi-size: 16/32/48/256)
+ *   icon.rgba          Rust set_icon() — raw 64×64 RGBA bytes
+ *
+ * Run:  node scripts/gen-icons.cjs
+ */
+
+"use strict";
+
+const fs   = require("fs");
 const path = require("path");
+const sharp = require("sharp");
 
-const iconsDir = path.join(__dirname, "..", "src-tauri", "icons");
-if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true });
+const SRC = path.join(__dirname, "..", "src-tauri", "icons", "icon.png");
+const OUT = path.join(__dirname, "..", "src-tauri", "icons");
 
-// Minimal valid PNG: 32x32 solid blue (#58a6ff)
-function createPng(width, height) {
-  function crc32(buf) {
-    let c;
-    const table = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      table[n] = c;
-    }
-    c = 0xffffffff;
-    for (let i = 0; i < buf.length; i++) c = table[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  }
-
-  function chunk(type, data) {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length);
-    const typeData = Buffer.concat([Buffer.from(type), data]);
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(crc32(typeData));
-    return Buffer.concat([len, typeData, crc]);
-  }
-
-  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-
-  // IHDR
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // color type: RGB
-  ihdr[10] = 0; // compression
-  ihdr[11] = 0; // filter
-  ihdr[12] = 0; // interlace
-
-  // IDAT - raw image data with zlib
-  const rawRow = Buffer.alloc(1 + width * 3); // filter byte + RGB
-  rawRow[0] = 0; // no filter
-  for (let x = 0; x < width; x++) {
-    rawRow[1 + x * 3] = 0x58;     // R
-    rawRow[1 + x * 3 + 1] = 0xa6; // G
-    rawRow[1 + x * 3 + 2] = 0xff; // B
-  }
-
-  const rawData = Buffer.concat(Array(height).fill(rawRow));
-
-  // Simple zlib wrapping (deflate stored blocks)
-  const zlibData = [];
-  zlibData.push(Buffer.from([0x78, 0x01])); // zlib header
-
-  let offset = 0;
-  while (offset < rawData.length) {
-    const remaining = rawData.length - offset;
-    const blockSize = Math.min(remaining, 65535);
-    const isLast = offset + blockSize >= rawData.length;
-    const header = Buffer.alloc(5);
-    header[0] = isLast ? 1 : 0;
-    header.writeUInt16LE(blockSize, 1);
-    header.writeUInt16LE(blockSize ^ 0xffff, 3);
-    zlibData.push(header);
-    zlibData.push(rawData.subarray(offset, offset + blockSize));
-    offset += blockSize;
-  }
-
-  // Adler-32 checksum
-  let a = 1, b = 0;
-  for (let i = 0; i < rawData.length; i++) {
-    a = (a + rawData[i]) % 65521;
-    b = (b + a) % 65521;
-  }
-  const adler = Buffer.alloc(4);
-  adler.writeUInt32BE(((b << 16) | a) >>> 0);
-  zlibData.push(adler);
-
-  const compressedData = Buffer.concat(zlibData);
-
-  return Buffer.concat([
-    sig,
-    chunk("IHDR", ihdr),
-    chunk("IDAT", compressedData),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
+if (!fs.existsSync(SRC)) {
+  console.error(`ERROR: Source icon not found at ${SRC}`);
+  console.error("Place your new icon.png at src-tauri/icons/icon.png first.");
+  process.exit(1);
 }
 
-// ICO format wrapping a PNG
-function createIco(pngBuf, width, height) {
+// ── PNG sizes ────────────────────────────────────────────────────────────────
+const PNG_TARGETS = [
+  { file: "32x32.png",       px: 32  },
+  { file: "128x128.png",     px: 128 },
+  { file: "128x128@2x.png",  px: 256 }, // 2× = 256 px
+];
+
+// ── ICO layers (all embedded as PNG inside the ICO container) ────────────────
+const ICO_SIZES = [16, 32, 48, 64, 256];
+
+// ── icon.rgba size (matches include_bytes! + Image::new_owned in lib.rs) ────
+const RGBA_PX = 64;
+
+// ── Resize helper ─────────────────────────────────────────────────────────────
+function resize(px) {
+  return sharp(SRC).resize(px, px, {
+    fit: "contain",
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  });
+}
+
+// ── Build multi-resolution ICO from an array of PNG buffers ──────────────────
+function buildIco(images /* [{ px, buf }] */) {
+  const n = images.length;
+  const DIR_ENTRY_SIZE = 16;
+  const headerSize = 6 + n * DIR_ENTRY_SIZE;
+  let dataOffset = headerSize;
+
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0); // reserved
-  header.writeUInt16LE(1, 2); // ICO type
-  header.writeUInt16LE(1, 4); // 1 image
+  header.writeUInt16LE(1, 2); // type: ICO
+  header.writeUInt16LE(n, 4);
 
-  const entry = Buffer.alloc(16);
-  entry[0] = width >= 256 ? 0 : width;
-  entry[1] = height >= 256 ? 0 : height;
-  entry[2] = 0; // palette
-  entry[3] = 0; // reserved
-  entry.writeUInt16LE(1, 4); // color planes
-  entry.writeUInt16LE(32, 6); // bits per pixel
-  entry.writeUInt32LE(pngBuf.length, 8); // size
-  entry.writeUInt32LE(6 + 16, 12); // offset
+  const entries = [];
+  const payloads = [];
 
-  return Buffer.concat([header, entry, pngBuf]);
+  for (const { px, buf } of images) {
+    const e = Buffer.alloc(DIR_ENTRY_SIZE);
+    e[0] = px >= 256 ? 0 : px; // 0 means 256 in ICO spec
+    e[1] = px >= 256 ? 0 : px;
+    e[2] = 0;  // colour count (0 = no palette)
+    e[3] = 0;  // reserved
+    e.writeUInt16LE(1,  4); // colour planes
+    e.writeUInt16LE(32, 6); // bits per pixel
+    e.writeUInt32LE(buf.length, 8);  // image data size
+    e.writeUInt32LE(dataOffset, 12); // offset to image data
+    dataOffset += buf.length;
+    entries.push(e);
+    payloads.push(buf);
+  }
+
+  return Buffer.concat([header, ...entries, ...payloads]);
 }
 
-// Generate files
-const png32 = createPng(32, 32);
-const png128 = createPng(128, 128);
-const png256 = createPng(256, 256);
+// ── Main ─────────────────────────────────────────────────────────────────────
+async function main() {
+  console.log(`Source: ${SRC}\n`);
 
-fs.writeFileSync(path.join(iconsDir, "32x32.png"), png32);
-fs.writeFileSync(path.join(iconsDir, "128x128.png"), png128);
-fs.writeFileSync(path.join(iconsDir, "128x128@2x.png"), png256);
-fs.writeFileSync(path.join(iconsDir, "icon.ico"), createIco(png32, 32, 32));
-fs.writeFileSync(path.join(iconsDir, "icon.png"), png256);
+  // 1. PNG files
+  for (const { file, px } of PNG_TARGETS) {
+    const dest = path.join(OUT, file);
+    await resize(px).png().toFile(dest);
+    console.log(`  ✓  ${file}  (${px}×${px})`);
+  }
 
-console.log("Icons generated in src-tauri/icons/");
+  // 2. icon.rgba — raw RGBA bytes, no file header
+  const rawBuf = await resize(RGBA_PX)
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+  fs.writeFileSync(path.join(OUT, "icon.rgba"), rawBuf);
+  console.log(`  ✓  icon.rgba  (${RGBA_PX}×${RGBA_PX} raw RGBA, ${rawBuf.length} bytes)`);
+
+  // 3. icon.ico (multi-resolution)
+  const icoImages = [];
+  for (const px of ICO_SIZES) {
+    const buf = await resize(px).png().toBuffer();
+    icoImages.push({ px, buf });
+    console.log(`  ·  ico layer ${px}×${px}  (${buf.length} bytes)`);
+  }
+  const ico = buildIco(icoImages);
+  fs.writeFileSync(path.join(OUT, "icon.ico"), ico);
+  console.log(`  ✓  icon.ico  (layers: ${ICO_SIZES.join(", ")})`);
+
+  console.log("\nAll icons generated. Run  npm run tauri dev  to test.");
+}
+
+main().catch((err) => {
+  console.error("gen-icons failed:", err.message ?? err);
+  process.exit(1);
+});
