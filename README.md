@@ -161,7 +161,7 @@ Please keep PRs focused — one feature or fix per PR.
 
 ### v1.0.0 (Apr 2026)
 - Official release — all features from v0.1.x are now production-ready
-- New app icon: HJ ligature design with amber highlight bar
+- New app icon with improved visibility at small sizes
 - PDF internal reference click with return-to-position and extended flash animation
 - Updated README with "Why HYJI?" section highlighting key differentiators
 
