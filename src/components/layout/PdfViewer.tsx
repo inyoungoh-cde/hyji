@@ -55,6 +55,8 @@ export function PdfViewer() {
   const [editingTabTitle, setEditingTabTitle] = useState(false);
   const [tabTitleInput, setTabTitleInput] = useState("");
   const tabTitleInputRef = useRef<HTMLInputElement>(null);
+  // "Back to reading position" after clicking an internal PDF reference link
+  const [backScrollTop, setBackScrollTop] = useState<number | null>(null);
 
   const onDocLoaded = useCallback((doc: PDFDocumentProxy) => {
     setTotalPages(doc.numPages);
@@ -622,6 +624,7 @@ export function PdfViewer() {
           annotations={annotations}
           onMemoOpen={(id, sx, sy) => setEditingMemo({ id, x: sx, y: sy })}
           onAnnotationDelete={(id) => { if (activePaperId) deleteAnnotation(id, activePaperId); }}
+          onInternalNavigate={(fromY) => setBackScrollTop(fromY)}
         />
       ) : (
         <div className="flex-1 flex items-center justify-center">
@@ -670,6 +673,40 @@ export function PdfViewer() {
         />
       )}
       <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+
+      {/* Floating "Back to reading position" button — appears after clicking an internal link */}
+      {backScrollTop !== null && (
+        <div
+          className="fixed z-[300] flex items-center gap-2 px-3 py-2 rounded-full shadow-xl cursor-pointer select-none"
+          style={{
+            bottom: "28px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(30, 36, 48, 0.92)",
+            border: "1px solid rgba(88,166,255,0.5)",
+            backdropFilter: "blur(6px)",
+            animation: "fadeInUp 0.2s ease-out",
+          }}
+          onClick={() => {
+            pdfCanvasRef.current?.scrollToY(backScrollTop);
+            setBackScrollTop(null);
+          }}
+          title="Return to where you were reading"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-accent flex-shrink-0">
+            <path d="M9 2L4 7l5 5" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className="text-small font-medium text-accent whitespace-nowrap">읽던 위치로</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setBackScrollTop(null); }}
+            className="ml-1 text-text-tertiary hover:text-text-primary transition-colors leading-none text-body"
+            title="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {editingMemo && (() => {
         const memoAnn = annotations.find((a) => a.id === editingMemo.id);
         if (!memoAnn) return null;

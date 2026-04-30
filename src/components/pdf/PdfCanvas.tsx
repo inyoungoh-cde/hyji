@@ -41,6 +41,9 @@ interface PdfCanvasProps {
   annotations: Annotation[];
   onMemoOpen: (annotationId: string, screenX: number, screenY: number) => void;
   onAnnotationDelete: (annotationId: string) => void;
+  /** Called when the user clicks an internal PDF link (e.g. [3] reference).
+   *  Passes the scroll position BEFORE navigation so the caller can offer a "Back" button. */
+  onInternalNavigate?: (fromScrollTop: number) => void;
 }
 
 interface PageEntry {
@@ -52,6 +55,8 @@ interface PageEntry {
 export interface PdfCanvasHandle {
   getPrintImages: () => Promise<string[]>;
   renderAllPages: () => Promise<void>;
+  /** Smooth-scroll the PDF viewer to a specific scrollTop value. */
+  scrollToY: (y: number) => void;
 }
 
 export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function PdfCanvas({
@@ -69,6 +74,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   annotations,
   onMemoOpen,
   onAnnotationDelete,
+  onInternalNavigate,
 }: PdfCanvasProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
@@ -241,6 +247,10 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
             const containerRect = scrollContainer.getBoundingClientRect();
             const pageRect = pageEl.getBoundingClientRect();
             if (yPdf != null) {
+              // Record pre-navigation position for the "Back" button
+              const fromScrollTop = scrollContainer.scrollTop;
+              onInternalNavigate?.(fromScrollTop);
+
               // PDF y is from bottom; convert to top-down
               const pageEntry = pages.find((p) => p.pageNum === targetPage);
               const pageHeightPt = pageEntry?.height ?? 842;
@@ -248,19 +258,21 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
               const targetY = scrollContainer.scrollTop + (pageRect.top - containerRect.top) + yFromTop - 80;
               scrollContainer.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
 
-              // Flash indicator at target position
+              // Flash indicator — 3.5s so it's easy to spot
               const flash = document.createElement("div");
               flash.style.cssText = `
                 position: absolute; left: 0; top: ${yFromTop}px;
-                width: 100%; height: 24px;
+                width: 100%; height: 28px;
                 background: rgba(88, 166, 255, 0.45);
                 pointer-events: none; z-index: 10;
-                border-radius: 2px;
-                animation: hyji-flash 2s ease-out forwards;
+                border-radius: 3px;
+                animation: hyji-flash 3.5s ease-out forwards;
               `;
               pageEl.appendChild(flash);
-              setTimeout(() => flash.remove(), 2000);
+              setTimeout(() => flash.remove(), 3500);
             } else {
+              const fromScrollTop = scrollContainer.scrollTop;
+              onInternalNavigate?.(fromScrollTop);
               pageEl.scrollIntoView({ behavior: "smooth" });
             }
           } catch { /* ignore invalid destinations */ }
@@ -368,6 +380,9 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       for (const p of pages) {
         await renderPage(p.pageNum);
       }
+    },
+    scrollToY: (y: number) => {
+      containerRef.current?.scrollTo({ top: y, behavior: "smooth" });
     },
   }), [pages, doc, renderPage, annotations]);
 

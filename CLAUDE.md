@@ -598,7 +598,6 @@ Help
 - [x] Tauri auto-updater via GitHub releases — release.yml + tauri-plugin-updater
 - [x] Windows .msi installer — GitHub Actions produces signed .msi
 - [x] Performance: virtual scrolling for large paper lists — @tanstack/react-virtual in ProjectTree
-- [ ] Notion script generator
 
 ### Phase 1.1 — Stability + File Association (v0.1.5–v0.1.6) ✅
 - [x] Scrollbar visibility — 8px white thumb (40 % / 60 % hover), transparent track

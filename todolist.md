@@ -20,13 +20,6 @@ _Last updated: 2026-04-30 (v0.1.7)_
 
 ---
 
-## Missing Features (from original Phase 1.0 spec)
-
-- [ ] **Notion script generator**
-  - Generate Python script using `notion-client` to export papers to a Notion DB
-  - Fields: title, authors, year, venue, status, importance, summary, differentiation, questions, link, PDF path
-  - User sets Notion API token and parent page ID; script handles DB creation + inserts
-
 ---
 
 ## Quality / UX Improvements (future)
