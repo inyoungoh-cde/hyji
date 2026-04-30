@@ -84,6 +84,8 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());       // outer page wrapper (for observer, scroll, text queries)
   const renderRefs = useRef<Map<number, HTMLDivElement>>(new Map());     // inner div (for imperative canvas/textLayer rendering)
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Live selection overlay — shows clean merged rects while the user drags
+  const [liveSelRects, setLiveSelRects] = useState<Array<{ left: number; top: number; width: number; height: number }>>([]);
 
   // Load document
   useEffect(() => {
@@ -536,6 +538,29 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     });
   }, [searchQuery, searchIndex, onSearchResults]);
 
+  // Live selection overlay — track the selection as the user drags and render
+  // clean merged-line rects instead of relying on ::selection CSS (which bleeds
+  // across transformed whitespace spans in the PDF text layer).
+  useEffect(() => {
+    const handleSelChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) {
+        setLiveSelRects([]);
+        return;
+      }
+      // Only react to selections within this PDF container
+      const range = sel.getRangeAt(0);
+      if (!containerRef.current?.contains(range.commonAncestorContainer)) {
+        setLiveSelRects([]);
+        return;
+      }
+      const merged = mergeToLineRects(Array.from(range.getClientRects()));
+      setLiveSelRects(merged);
+    };
+    document.addEventListener("selectionchange", handleSelChange);
+    return () => document.removeEventListener("selectionchange", handleSelChange);
+  }, []);
+
   // Shared logic: read current selection and fire onContextMenu.
   // Used by both mouseup (auto-show) and right-click handlers.
   const fireContextMenuFromSelection = useCallback((clientX: number, clientY: number) => {
@@ -557,21 +582,24 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     const range = selection.getRangeAt(0);
     const clientRects = Array.from(range.getClientRects());
     const pageRect = pageEl.getBoundingClientRect();
-    const rects: PdfRect[] = clientRects
-      .filter((r) => r.width > 0 && r.height > 0)
-      .map((r) => ({
-        x: (r.left - pageRect.left) / scale,
-        y: (r.top - pageRect.top) / scale,
-        w: r.width / scale,
-        h: r.height / scale,
-        pageIndex: page,
-      }));
 
-    // Position the menu just below the last selection rect,
-    // falling back to the cursor position if no rects are available.
-    const lastRect = clientRects[clientRects.length - 1];
-    const menuX = lastRect ? lastRect.right : clientX;
-    const menuY = lastRect ? lastRect.bottom + 4 : clientY;
+    // Merge rects per line so stored highlights have no gaps at spaces
+    const mergedViewport = mergeToLineRects(clientRects);
+    const rects: PdfRect[] = mergedViewport.map((r) => ({
+      x: (r.left - pageRect.left) / scale,
+      y: (r.top - pageRect.top) / scale,
+      w: r.width / scale,
+      h: r.height / scale,
+      pageIndex: page,
+    }));
+
+    // Clear live overlay — the SVG annotation takes over
+    setLiveSelRects([]);
+
+    // Position the menu just below the last selection rect
+    const lastVP = mergedViewport[mergedViewport.length - 1];
+    const menuX = lastVP ? lastVP.left + lastVP.width : clientX;
+    const menuY = lastVP ? lastVP.top + lastVP.height + 4 : clientY;
 
     onContextMenu({ x: menuX, y: menuY, selectedText, page, rects });
   }, [scale, onContextMenu]);
@@ -602,6 +630,27 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         }, 80);
       }}
     >
+      {/* Live selection overlay — clean merged rects replace the CSS ::selection
+          bleed that occurs on whitespace spans with large scaleX transforms */}
+      {liveSelRects.length > 0 && (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 9 }}>
+          {liveSelRects.map((r, i) => (
+            <div
+              key={i}
+              style={{
+                position: "fixed",
+                left: r.left,
+                top: r.top,
+                width: r.width,
+                height: r.height,
+                background: "rgba(88, 166, 255, 0.28)",
+                pointerEvents: "none",
+                borderRadius: "2px",
+              }}
+            />
+          ))}
+        </div>
+      )}
         <div className="flex flex-col items-center gap-3 py-4 hyji-pdf-pages">
           {pages.map((p) => (
             <div
@@ -643,3 +692,37 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     </div>
   );
 });
+
+// ── Utility: merge DOMRects that share the same visual line ──────────────────
+// Groups rects by approximate top value and merges each group into one wide
+// rect spanning left→right. This fills the gaps that appear at spaces, which
+// getClientRects() does not include (spaces produce no rect in pdf.js text layer).
+function mergeToLineRects(
+  rects: DOMRect[]
+): Array<{ left: number; top: number; width: number; height: number }> {
+  const valid = rects.filter((r) => r.width > 1 && r.height > 1);
+  if (valid.length === 0) return [];
+
+  // Sort top → bottom, left → right
+  const sorted = [...valid].sort((a, b) => a.top - b.top || a.left - b.left);
+
+  const LINE_TOLERANCE = 4; // px — rects within this y-delta are on the same line
+  const lines: DOMRect[][] = [];
+
+  for (const r of sorted) {
+    const last = lines[lines.length - 1];
+    if (!last || Math.abs(r.top - last[0].top) > LINE_TOLERANCE) {
+      lines.push([r]);
+    } else {
+      last.push(r);
+    }
+  }
+
+  return lines.map((line) => {
+    const left   = Math.min(...line.map((r) => r.left));
+    const top    = Math.min(...line.map((r) => r.top));
+    const right  = Math.max(...line.map((r) => r.right));
+    const bottom = Math.max(...line.map((r) => r.bottom));
+    return { left, top, width: right - left, height: bottom - top };
+  });
+}

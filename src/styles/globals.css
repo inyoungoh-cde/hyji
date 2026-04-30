@@ -158,25 +158,14 @@ body {
   cursor: default;
 }
 
-/* Selection colors — kept very subtle to avoid the full-line bleed that occurs
-   when whitespace spans have large transform:scaleX values applied by pdf.js.
-   The actual stored highlight (SVG overlay) provides the real visual feedback. */
-.textLayer ::-moz-selection {
-  background: rgba(88, 166, 255, 0.12);
-}
-
-.textLayer ::selection {
-  background: rgba(88, 166, 255, 0.12);
-  color: transparent;
-}
-
-.textLayer br::-moz-selection {
-  background: transparent;
-}
-
-.textLayer br::selection {
-  background: transparent;
-}
+/* ::selection is completely suppressed in the text layer.
+   Whitespace spans have large transform:scaleX values that cause the browser
+   selection background to bleed across the full line.
+   We render our own clean merged-line overlay (liveSelRects in PdfCanvas) instead. */
+.textLayer ::-moz-selection { background: transparent; }
+.textLayer ::selection       { background: transparent; color: transparent; }
+.textLayer br::-moz-selection { background: transparent; }
+.textLayer br::selection      { background: transparent; }
 
 /* ==========================================================================
    PDF annotation layer — clickable links (URLs + internal references)

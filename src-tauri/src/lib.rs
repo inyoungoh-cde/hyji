@@ -76,8 +76,6 @@ pub fn run() {
                 .text("export-selected", "Export Selected...")
                 .text("export-all", "Export All...")
                 .separator()
-                .text("preferences", "Preferences...")
-                .separator()
                 .quit()
                 .build()?;
 
@@ -119,6 +117,8 @@ pub fn run() {
                 .text("db-restore", "Restore from Backup...")
                 .separator()
                 .text("preferences", "Preferences...")
+                .separator()
+                .text("clear-all-data", "Reset to Blank (Clear All Data)...")
                 .build()?;
 
             let help_menu = SubmenuBuilder::new(app, "Help")

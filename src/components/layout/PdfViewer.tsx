@@ -368,6 +368,28 @@ export function PdfViewer() {
         }
       }),
 
+      onMenuEvent("clear-all-data", async () => {
+        const { ask, message } = await import("@tauri-apps/plugin-dialog");
+        const confirmed = await ask(
+          "This will permanently delete ALL papers, folders, highlights, notes, and keywords.\n\nThe app will restart with a completely blank state.\n\nThis cannot be undone.\n\nContinue?",
+          { title: "Reset to Blank", kind: "warning" }
+        );
+        if (!confirmed) return;
+        try {
+          const db = await (await import("../../lib/db")).getDb();
+          await db.execute("DELETE FROM note_links");
+          await db.execute("DELETE FROM keywords");
+          await db.execute("DELETE FROM annotations");
+          await db.execute("DELETE FROM papers");
+          await db.execute("DELETE FROM projects");
+          await message("All data cleared. HYJI will now restart.", { title: "Reset complete", kind: "info" });
+          window.location.reload();
+        } catch (e) {
+          const { message: msg } = await import("@tauri-apps/plugin-dialog");
+          await msg(`Clear failed: ${String(e)}`, { title: "Error", kind: "error" });
+        }
+      }),
+
       onMenuEvent("db-restore", async () => {
         const { open, ask, message } = await import("@tauri-apps/plugin-dialog");
         const { copyFile } = await import("@tauri-apps/plugin-fs");
