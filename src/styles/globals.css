@@ -166,10 +166,11 @@ body {
   cursor: default;
 }
 
-/* ::selection — clip-path: inset(0) on each span prevents the bleed from
-   large transform:scaleX whitespace spans, so we can use a visible opacity. */
-.textLayer ::-moz-selection { background: rgba(88, 166, 255, 0.35); }
-.textLayer ::selection       { background: rgba(88, 166, 255, 0.35); color: transparent; }
+/* ::selection fully suppressed — we use a single bounding-box overlay in
+   PdfCanvas instead. This completely eliminates the whitespace-span flash
+   caused by large transform:scaleX values in the pdf.js text layer. */
+.textLayer ::-moz-selection  { background: transparent; }
+.textLayer ::selection        { background: transparent; color: transparent; }
 .textLayer br::-moz-selection { background: transparent; }
 .textLayer br::selection      { background: transparent; }
 

@@ -84,6 +84,10 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());       // outer page wrapper (for observer, scroll, text queries)
   const renderRefs = useRef<Map<number, HTMLDivElement>>(new Map());     // inner div (for imperative canvas/textLayer rendering)
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Single bounding-box overlay shown while the user drags to select text.
+  // Using getBoundingClientRect() on the range gives one smooth rect that
+  // never touches individual span transforms — so no whitespace-span flash.
+  const [selBounds, setSelBounds] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
   // Load document
   useEffect(() => {
@@ -536,6 +540,23 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     });
   }, [searchQuery, searchIndex, onSearchResults]);
 
+  // Track selection bounds while dragging using a single bounding rect.
+  // getBoundingClientRect() never queries individual span transforms, so
+  // whitespace spans with large scaleX cannot cause a flash.
+  useEffect(() => {
+    const onSelChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) { setSelBounds(null); return; }
+      const range = sel.getRangeAt(0);
+      if (!containerRef.current?.contains(range.commonAncestorContainer)) { setSelBounds(null); return; }
+      const b = range.getBoundingClientRect();
+      if (b.width > 0 && b.height > 0) {
+        setSelBounds({ left: b.left, top: b.top, width: b.width, height: b.height });
+      }
+    };
+    document.addEventListener("selectionchange", onSelChange);
+    return () => document.removeEventListener("selectionchange", onSelChange);
+  }, []);
 
   // Shared logic: read current selection and fire onContextMenu.
   // Used by both mouseup (auto-show) and right-click handlers.
@@ -575,6 +596,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     const menuX = lastVP ? lastVP.left + lastVP.width : clientX;
     const menuY = lastVP ? lastVP.top + lastVP.height + 4 : clientY;
 
+    setSelBounds(null);
     onContextMenu({ x: menuX, y: menuY, selectedText, page, rects });
   }, [scale, onContextMenu]);
 
@@ -604,6 +626,20 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         }, 80);
       }}
     >
+      {/* Single bounding-box selection indicator — avoids per-span ::selection bleed */}
+      {selBounds && (
+        <div
+          className="fixed pointer-events-none"
+          style={{
+            left: selBounds.left, top: selBounds.top,
+            width: selBounds.width, height: selBounds.height,
+            background: "rgba(88, 166, 255, 0.18)",
+            border: "1px solid rgba(88, 166, 255, 0.4)",
+            borderRadius: "2px",
+            zIndex: 9,
+          }}
+        />
+      )}
         <div className="flex flex-col items-center gap-3 py-4 hyji-pdf-pages">
           {pages.map((p) => (
             <div
