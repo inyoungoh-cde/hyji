@@ -129,6 +129,14 @@ body {
   -webkit-user-select: text;
   -moz-user-select: text;
   user-select: text;
+
+  /* Clip ::selection background to the span's pre-transform bounding box.
+     Whitespace spans have large transform:scaleX values; without this clip
+     the ::selection background renders at the scaled (transformed) size,
+     causing the full-line bleed when dragging over spaces. Since all span
+     text is transparent (canvas renders the real glyphs), clipping has
+     no visual downside on text content. */
+  clip-path: inset(0);
 }
 
 .textLayer {
@@ -158,12 +166,10 @@ body {
   cursor: default;
 }
 
-/* ::selection kept very subtle — whitespace spans have large transform:scaleX
-   that would bleed the full line at higher opacities. 0.08 gives a faint hint
-   without the jarring full-line flash. Gaps between words are filled by
-   mergeToLineRects when the annotation is stored. */
-.textLayer ::-moz-selection { background: rgba(88, 166, 255, 0.08); }
-.textLayer ::selection       { background: rgba(88, 166, 255, 0.08); color: transparent; }
+/* ::selection — clip-path: inset(0) on each span prevents the bleed from
+   large transform:scaleX whitespace spans, so we can use a visible opacity. */
+.textLayer ::-moz-selection { background: rgba(88, 166, 255, 0.35); }
+.textLayer ::selection       { background: rgba(88, 166, 255, 0.35); color: transparent; }
 .textLayer br::-moz-selection { background: transparent; }
 .textLayer br::selection      { background: transparent; }
 
