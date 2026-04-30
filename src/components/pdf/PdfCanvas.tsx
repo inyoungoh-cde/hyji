@@ -189,16 +189,30 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
 
       // Mark whitespace-only spans so their ::selection background can be
       // suppressed via CSS without removing them from the selection range
-      // (copy-paste still works). Two signals for a whitespace span:
-      //   1. textContent is empty after trim() — pure space character(s)
-      //   2. transform scaleX > 3 — a tiny character stretched to cover a gap
+      // (copy-paste still works). Three signals for a whitespace span:
+      //   1. textContent is empty after trim()
+      //   2. inline transform has scaleX > 2 (lowered from 3; this PDF's
+      //      space spans appear to have scaleX in the 2–3 range)
+      //   3. span width >> character count × font size (stretched filler)
       textLayerDiv.querySelectorAll<HTMLElement>("span").forEach((span) => {
-        if (span.textContent?.trim() === "") {
+        const text = span.textContent ?? "";
+        if (text.trim() === "") {
           span.classList.add("pdfjs-space");
           return;
         }
-        const tx = new DOMMatrix(getComputedStyle(span).transform);
-        if (tx.a > 3) span.classList.add("pdfjs-space");
+        // Parse scaleX directly from inline style (fastest; pdf.js sets it inline)
+        const inlineMatch = span.style.transform.match(/scaleX\(([^)]+)\)/);
+        const scaleX = inlineMatch ? parseFloat(inlineMatch[1]) : 1;
+        if (scaleX > 2) {
+          span.classList.add("pdfjs-space");
+          return;
+        }
+        // Fallback: span width is disproportionately large for its character count
+        // e.g. a 1-char span that's wider than 3× the font-size is likely a spacer
+        const fontSize = parseFloat(getComputedStyle(span).fontSize) || 12;
+        if (span.offsetWidth > fontSize * 3 * Math.max(1, text.length)) {
+          span.classList.add("pdfjs-space");
+        }
       });
 
       // Create endOfContent div — required for drag-to-select across spans.
