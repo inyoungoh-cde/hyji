@@ -176,6 +176,10 @@ Please keep PRs focused — one feature or fix per PR.
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
 
+### v2.1 (Jul 2026)
+- Fixed blurry PDF rendering on high-DPI / portrait / secondary monitors — pages re-render when the display's pixel ratio changes instead of stretching the old bitmap
+- Focus Mode re-fits and re-renders on window resize or monitor move, so pages stay sharp
+
 ### v2.0 (Jul 2026)
 - Network & privacy section in Preferences with an **Offline mode** switch — turn it on and HYJI makes no network requests at all
 - One-time notice before the first metadata lookup explaining exactly what is sent (only the DOI/arXiv ID, directly to Crossref/arXiv)

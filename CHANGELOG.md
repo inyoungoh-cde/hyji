@@ -7,6 +7,13 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.1] - 2026-07-20
+
+### Fixed
+
+- **Sharp PDF rendering on high-DPI and secondary monitors** — page canvases were cached per zoom level only, so moving the window to a monitor with a different display scale (or changing Windows DPI) kept the old bitmap and the OS stretched it into blur. HYJI now tracks `devicePixelRatio` and re-renders every page the moment it changes, with the text layer and highlight overlay rebuilt to match.
+- **Focus Mode stays crisp on resize** — Focus Mode computed its fit-to-width scale once on entry; resizing the window (or moving it to a portrait/secondary monitor) afterwards stretched the existing canvas instead of re-rendering. The viewer now watches its own size while Focus Mode is active and re-renders at the exact new fit-width scale.
+
 ## [2.0] - 2026-07-20
 
 ### Added
