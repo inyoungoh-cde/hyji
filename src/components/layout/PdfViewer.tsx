@@ -80,9 +80,17 @@ export function PdfViewer() {
   useEffect(() => {
     if (!goToRequest || goToRequest.paperId !== activePaperId || totalPages === 0) return;
     const page = Math.min(Math.max(1, goToRequest.page), totalPages);
+    const query = goToRequest.query ?? "";
     const t = setTimeout(() => {
       setGoToPage(page);
       setTimeout(() => setGoToPage(null), 120);
+      // Hand the library-search query to the in-PDF search so the match
+      // lights up on the page the user just jumped to.
+      if (query) {
+        setSearchQuery(query);
+        setSearchIndex(0);
+        setShowSearch(true);
+      }
       useUiStore.getState().clearGoToRequest();
     }, 250);
     return () => clearTimeout(t);

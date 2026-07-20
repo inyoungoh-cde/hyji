@@ -93,8 +93,10 @@ interface UiState {
   selectedProjectId: string | null;
   keywordFilter: string | null;
   scrollToAnnotation: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null;
-  /** Pending "open paper at page" request (from global search results). */
-  goToRequest: { paperId: string; page: number } | null;
+  /** Pending "open paper at page" request (from global search results).
+   *  When query is set, the in-PDF search picks it up so the match is
+   *  highlighted on arrival. */
+  goToRequest: { paperId: string; page: number; query?: string } | null;
   textSize: TextSize;
   /** Dark-mode PDF rendering (inverted canvas for night reading). */
   pdfDarkMode: boolean;
@@ -111,7 +113,7 @@ interface UiState {
   setKeywordFilter: (keyword: string | null) => void;
   setScrollToAnnotation: (req: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null) => void;
   /** Open a paper as a tab and scroll to the given page once it loads. */
-  requestGoTo: (paperId: string, page: number) => void;
+  requestGoTo: (paperId: string, page: number, query?: string) => void;
   clearGoToRequest: () => void;
   setTextSize: (size: TextSize) => void;
   togglePdfDarkMode: () => void;
@@ -222,9 +224,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSelectedProject: (id) => set({ selectedProjectId: id }),
   setKeywordFilter: (keyword) => set({ keywordFilter: keyword }),
   setScrollToAnnotation: (req) => set({ scrollToAnnotation: req }),
-  requestGoTo: (paperId, page) => {
+  requestGoTo: (paperId, page, query) => {
     get().setActivePaper(paperId);
-    set({ goToRequest: { paperId, page } });
+    set({ goToRequest: { paperId, page, query } });
   },
   clearGoToRequest: () => set({ goToRequest: null }),
   setTextSize: (size) => {

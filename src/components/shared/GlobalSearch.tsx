@@ -94,7 +94,8 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
     if (row.kind === "paper") {
       useUiStore.getState().setActivePaper(row.paper.id);
     } else {
-      useUiStore.getState().requestGoTo(row.paper.id, row.hit.page);
+      // Carry the query into the in-PDF search so the match is highlighted
+      useUiStore.getState().requestGoTo(row.paper.id, row.hit.page, query.trim());
     }
     onClose();
   };
@@ -205,6 +206,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
           <span>↑↓ navigate</span>
           <span>Enter open</span>
           <span>Esc close</span>
+          <span className="ml-auto">Ctrl+F searches inside the open PDF</span>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { emitMenuEvent } from "../../lib/menuEvents";
 
 interface ToolbarProps {
   currentPage: number;
@@ -76,6 +77,12 @@ export function Toolbar({
       searchRef.current.focus();
     }
   }, [showSearch]);
+
+  // Sync the input when the query is set from outside — e.g. a global-search
+  // result carrying its query into this document's search.
+  useEffect(() => {
+    setSearchInput(searchQuery);
+  }, [searchQuery]);
 
   const zoomIn = () => {
     const next = ZOOM_STEPS.find((s) => s > scale);
@@ -199,9 +206,16 @@ export function Toolbar({
               onSearchChange(e.target.value);
             }}
             onKeyDown={handleSearchKeyDown}
-            placeholder="Find in PDF..."
+            placeholder="Find in this PDF…"
             className="w-[160px] bg-bg-tertiary text-body text-text-primary rounded px-2 py-0.5 outline-none border border-accent/40 transition-colors selectable"
           />
+          <button
+            onClick={() => emitMenuEvent("find-paper")}
+            className="px-1.5 py-0.5 rounded text-caption text-text-tertiary hover:text-accent hover:bg-bg-tertiary transition-colors whitespace-nowrap"
+            title="Search the whole library — titles and all PDF text (Ctrl+Shift+F)"
+          >
+            All PDFs
+          </button>
           {searchQuery && (
             <span className="text-small text-text-secondary min-w-[40px] text-center">
               {searchTotal > 0 ? `${searchIndex + 1}/${searchTotal}` : "0/0"}
