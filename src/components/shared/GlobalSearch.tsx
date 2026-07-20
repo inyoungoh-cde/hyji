@@ -1,49 +1,67 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePapersStore } from "../../stores/papers";
 import { useUiStore } from "../../stores/ui";
-import { searchLibrary, type SearchHit } from "../../lib/ftsSearch";
+import { searchLibrary, ensurePaperIndexed, type SearchHit } from "../../lib/ftsSearch";
 import type { Paper } from "../../types";
-
-interface GlobalSearchProps {
-  open: boolean;
-  onClose: () => void;
-}
 
 interface FtsGroup {
   paper: Paper;
   hits: SearchHit[];
 }
 
-/** Spotlight-style search across paper metadata and full PDF text. */
-export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
+/**
+ * Unified Spotlight-style search. Library scope covers metadata + every
+ * PDF's text; the "This document only" checkbox narrows it to the open
+ * paper (that scope is preset when invoked via Ctrl+F / the toolbar box).
+ */
+export function GlobalSearch() {
+  const overlayScope = useUiStore((s) => s.searchOverlayScope);
+  const activePaperId = useUiStore((s) => s.activePaperId);
   const papers = usePapersStore((s) => s.papers);
+  const open = overlayScope !== null;
+  const onClose = () => useUiStore.getState().closeSearchOverlay();
+
   const [query, setQuery] = useState("");
+  const [docOnly, setDocOnly] = useState(false);
   const [ftsGroups, setFtsGroups] = useState<FtsGroup[]>([]);
   const [searching, setSearching] = useState(false);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const activePaper = papers.find((p) => p.id === activePaperId);
+  const scopedToDoc = docOnly && !!activePaper;
+
   useEffect(() => {
     if (open) {
       setQuery("");
       setFtsGroups([]);
       setCursor(0);
+      setDocOnly(overlayScope === "document");
       setTimeout(() => inputRef.current?.focus(), 0);
+      // Document scope must search up-to-date text even if the background
+      // indexer hasn't reached this paper yet.
+      const paper = usePapersStore.getState().papers.find(
+        (p) => p.id === useUiStore.getState().activePaperId
+      );
+      if (overlayScope === "document" && paper) {
+        ensurePaperIndexed(paper).catch(() => undefined);
+      }
     }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, overlayScope]);
 
   // Metadata matches — instant, from the in-memory papers list
   const metaMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
+    if (!q || scopedToDoc) return [];
     return papers
       .filter((p) =>
         [p.title, p.authors, p.venue, p.summary]
           .some((f) => (f ?? "").toLowerCase().includes(q))
       )
       .slice(0, 6);
-  }, [papers, query]);
+  }, [papers, query, scopedToDoc]);
 
   // Full-text matches — debounced DB query, grouped per paper
   useEffect(() => {
@@ -55,7 +73,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        const hits = await searchLibrary(q);
+        const hits = await searchLibrary(q, 60, scopedToDoc ? activePaperId ?? undefined : undefined);
         const byPaper = new Map<string, SearchHit[]>();
         for (const h of hits) {
           if (!byPaper.has(h.paper_id)) byPaper.set(h.paper_id, []);
@@ -76,7 +94,8 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       }
     }, 220);
     return () => clearTimeout(t);
-  }, [query, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, open, scopedToDoc]);
 
   // Flat list of actionable rows for keyboard navigation
   const rows = useMemo(() => {
@@ -135,16 +154,32 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search papers and PDF contents…"
+            placeholder={scopedToDoc ? `Search in "${activePaper?.title ?? ""}"…` : "Search papers and PDF contents…"}
             className="flex-1 bg-transparent text-[1.077rem] text-text-primary outline-none placeholder:text-text-tertiary selectable"
           />
           {searching && <span className="text-caption text-text-tertiary">searching…</span>}
+          {activePaper && (
+            <label
+              className="flex items-center gap-1.5 text-caption text-text-secondary cursor-pointer whitespace-nowrap select-none"
+              title="Limit results to the currently open PDF (Ctrl+F opens with this on)"
+            >
+              <input
+                type="checkbox"
+                checked={docOnly}
+                onChange={(e) => { setDocOnly(e.target.checked); setCursor(0); }}
+                className="accent-[#58a6ff]"
+              />
+              This document only
+            </label>
+          )}
         </div>
 
         <div ref={listRef} className="max-h-[52vh] overflow-y-auto">
           {query.trim() && rows.length === 0 && !searching && (
             <div className="px-4 py-6 text-center text-body text-text-tertiary">
-              No matches in titles, notes, or PDF text.
+              {scopedToDoc
+                ? "No matches in this document."
+                : "No matches in titles, notes, or PDF text."}
             </div>
           )}
 
@@ -174,7 +209,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
 
           {ftsGroups.length > 0 && (
             <div className="px-4 pt-3 pb-1 text-caption font-bold uppercase tracking-wider text-text-tertiary">
-              In PDF text
+              {scopedToDoc ? "In this document" : "In PDF text"}
             </div>
           )}
           {ftsGroups.map((g) =>
@@ -206,7 +241,9 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
           <span>↑↓ navigate</span>
           <span>Enter open</span>
           <span>Esc close</span>
-          <span className="ml-auto">Ctrl+F searches inside the open PDF</span>
+          <span className="ml-auto">
+            {scopedToDoc ? "Enter jumps to the page and highlights the match" : "Ctrl+F opens this scoped to the open PDF"}
+          </span>
         </div>
       </div>
     </div>

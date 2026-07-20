@@ -321,7 +321,8 @@ export function PdfViewer() {
       }
       if (e.ctrlKey && e.key === "f") {
         e.preventDefault();
-        setShowSearch((s) => !s);
+        // Unified overlay, scoped to the open document
+        useUiStore.getState().openSearchOverlay("document");
       }
       if (e.ctrlKey && e.key === "n") {
         e.preventDefault();
@@ -392,7 +393,7 @@ export function PdfViewer() {
       // "shortcuts" (Ctrl+/) is handled app-wide in App.tsx
       onMenuEvent("smart-paste", () => setSmartPasteOpen(true)),
       onMenuEvent("import-pdf", () => setImportOpen(true)),
-      onMenuEvent("find-pdf", () => setShowSearch((s) => !s)),
+      onMenuEvent("find-pdf", () => useUiStore.getState().openSearchOverlay("document")),
       onMenuEvent("print-pdf", handlePrint),
       onMenuEvent("pdf-dark-mode", () => useUiStore.getState().togglePdfDarkMode()),
       onMenuEvent("focus-mode", toggleFocusMode),
@@ -750,6 +751,7 @@ export function PdfViewer() {
           onSearchPrev={handleSearchPrev}
           showSearch={showSearch}
           onToggleSearch={() => setShowSearch((s) => !s)}
+          onOpenSearch={() => useUiStore.getState().openSearchOverlay("document")}
           status={activePaper.status}
           importance={activePaper.importance}
           focusMode={focusMode}

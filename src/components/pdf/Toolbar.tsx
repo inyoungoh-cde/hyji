@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { emitMenuEvent } from "../../lib/menuEvents";
 
 interface ToolbarProps {
   currentPage: number;
@@ -16,6 +15,8 @@ interface ToolbarProps {
   onSearchPrev: () => void;
   showSearch: boolean;
   onToggleSearch: () => void;
+  /** Opens the unified search overlay scoped to this document. */
+  onOpenSearch?: () => void;
   status?: string;
   importance?: string;
   focusMode?: boolean;
@@ -59,6 +60,7 @@ export function Toolbar({
   onSearchPrev,
   showSearch,
   onToggleSearch,
+  onOpenSearch,
   status,
   importance,
   focusMode,
@@ -209,13 +211,6 @@ export function Toolbar({
             placeholder="Find in this PDF…"
             className="w-[160px] bg-bg-tertiary text-body text-text-primary rounded px-2 py-0.5 outline-none border border-accent/40 transition-colors selectable"
           />
-          <button
-            onClick={() => emitMenuEvent("find-paper")}
-            className="px-1.5 py-0.5 rounded text-caption text-text-tertiary hover:text-accent hover:bg-bg-tertiary transition-colors whitespace-nowrap"
-            title="Search the whole library — titles and all PDF text (Ctrl+Shift+F)"
-          >
-            All PDFs
-          </button>
           {searchQuery && (
             <span className="text-small text-text-secondary min-w-[40px] text-center">
               {searchTotal > 0 ? `${searchIndex + 1}/${searchTotal}` : "0/0"}
@@ -232,9 +227,23 @@ export function Toolbar({
           </button>
         </div>
       ) : (
-        <button onClick={onToggleSearch} className="px-2 py-0.5 rounded text-body text-text-secondary hover:bg-bg-tertiary transition-colors" title="Search (Ctrl+F)">
-          Search
-        </button>
+        /* Always-visible search box; interacting with it summons the unified
+           search overlay (scoped to this document) instead of inline typing. */
+        <input
+          readOnly
+          value=""
+          placeholder="Search…"
+          onFocus={(e) => {
+            e.currentTarget.blur();
+            (onOpenSearch ?? onToggleSearch)();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            (onOpenSearch ?? onToggleSearch)();
+          }}
+          title="Search this PDF (Ctrl+F) — untick 'This document only' for the whole library (Ctrl+Shift+F)"
+          className="w-[130px] bg-bg-tertiary text-body text-text-secondary rounded px-2 py-0.5 outline-none border border-transparent hover:border-accent/40 cursor-pointer transition-colors"
+        />
       )}
 
       {/* Dark mode toggle */}

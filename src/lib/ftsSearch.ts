@@ -154,28 +154,47 @@ function makeLikeSnippet(body: string, query: string): string {
   );
 }
 
-export async function searchLibrary(query: string, limit = 60): Promise<SearchHit[]> {
+/** Index a single paper if it isn't indexed yet (or its file moved). */
+export async function ensurePaperIndexed(paper: Paper): Promise<void> {
+  if (!paper.pdf_path || !(await ensureTables())) return;
+  const db = await getDb();
+  const meta = await db.select<{ pdf_path: string }[]>(
+    "SELECT pdf_path FROM fts_index_meta WHERE paper_id = ?",
+    [paper.id]
+  );
+  if (meta[0]?.pdf_path === paper.pdf_path) return;
+  await indexPaper(paper);
+}
+
+export async function searchLibrary(
+  query: string,
+  limit = 60,
+  paperId?: string
+): Promise<SearchHit[]> {
   const q = query.trim();
   if (!q || !(await ensureTables())) return [];
   const db = await getDb();
+  const scope = paperId ? " AND paper_id = ?" : "";
 
   // Trigram FTS needs 3+ characters; shorter queries scan with LIKE.
   if ([...q].length >= 3) {
     const phrase = `"${q.replace(/"/g, '""')}"`;
+    const params: unknown[] = paperId ? [phrase, paperId, limit] : [phrase, limit];
     const rows = await db.select<{ paper_id: string; page: number; snip: string }[]>(
       `SELECT paper_id, page, snippet(pdf_fts, 2, '⟪', '⟫', ' … ', 14) AS snip
-       FROM pdf_fts WHERE pdf_fts MATCH ?
+       FROM pdf_fts WHERE pdf_fts MATCH ?${scope}
        ORDER BY bm25(pdf_fts) LIMIT ?`,
-      [phrase, limit]
+      params
     );
     return rows.map((r) => ({ paper_id: r.paper_id, page: Number(r.page), snippet: r.snip }));
   }
 
   const escaped = q.replace(/([\\%_])/g, "\\$1");
+  const params: unknown[] = paperId ? [`%${escaped}%`, paperId, limit] : [`%${escaped}%`, limit];
   const rows = await db.select<{ paper_id: string; page: number; body: string }[]>(
     `SELECT paper_id, page, body FROM pdf_fts
-     WHERE body LIKE ? ESCAPE '\\' LIMIT ?`,
-    [`%${escaped}%`, limit]
+     WHERE body LIKE ? ESCAPE '\\'${scope} LIMIT ?`,
+    params
   );
   return rows.map((r) => ({
     paper_id: r.paper_id,

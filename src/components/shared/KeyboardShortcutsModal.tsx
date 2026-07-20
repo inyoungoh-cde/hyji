@@ -40,7 +40,7 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: "PDF Viewer",
     rows: [
-      { label: "Find in PDF", keys: ["Ctrl", "F"] },
+      { label: "Search this document", keys: ["Ctrl", "F"] },
       { label: "Print PDF", keys: ["Ctrl", "P"] },
       { label: "Close tab", keys: ["Ctrl", "W"] },
       { label: "PDF dark mode", keys: ["Ctrl", "D"] },

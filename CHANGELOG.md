@@ -6,12 +6,13 @@ All notable changes to HYJI will be documented in this file.
 
 ### Added
 
-- **Library-wide full-text search** — `Ctrl+Shift+F` (or Edit → Find Paper) opens a Spotlight-style search over your whole library: paper titles/authors/venues *and the actual text of every PDF*. Results show the matching page with a highlighted snippet; Enter or click opens the paper at that page in a tab. Works for Korean and English (SQLite FTS5 trigram index; 1–2 character queries use a substring scan so short Korean terms still match).
-- **Background indexing** — PDFs are indexed automatically a few seconds after launch and whenever new papers are imported; no setup. Tools → Rebuild Search Index… re-extracts everything from scratch.
+- **Unified full-text search** — one Spotlight-style overlay searches paper titles/authors/venues *and the actual text of every PDF* (Korean and English; SQLite FTS5 trigram index, with a substring scan for 1–2 character queries). `Ctrl+Shift+F` opens it over the whole library; `Ctrl+F` opens the same overlay pre-scoped with a **"This document only"** checkbox, so in-document search is simply a filter, not a separate feature. Results show the matching page with a highlighted snippet — Enter or click jumps there, and the query carries into the classic in-page match navigator (▲▼) so the hit is highlighted on arrival.
+- **Toolbar search box** — the toolbar now shows a persistent Search box; clicking or focusing it summons the overlay scoped to the open document. No retyping, no mode buttons.
+- **Background indexing** — PDFs are indexed automatically a few seconds after launch and whenever new papers are imported; opening the document-scoped search indexes that paper on demand if needed. Tools → Rebuild Search Index… re-extracts everything from scratch.
 
 ### Changed
 
-- `Ctrl+Shift+F` now opens the global search overlay; the sidebar paper filter remains available via the ⌕ button in the PAPERS section.
+- `Ctrl+F` / Edit → Find in PDF now opens the unified overlay (document scope) instead of the small inline bar; the inline bar still appears for stepping through matches after a jump. The sidebar paper filter remains available via the ⌕ button in the PAPERS section.
 
 ## [1.0.3] - 2026-07-20
 

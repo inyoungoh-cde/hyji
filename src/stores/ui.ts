@@ -97,6 +97,8 @@ interface UiState {
    *  When query is set, the in-PDF search picks it up so the match is
    *  highlighted on arrival. */
   goToRequest: { paperId: string; page: number; query?: string } | null;
+  /** Unified search overlay: null = closed; scope decides the default filter. */
+  searchOverlayScope: "library" | "document" | null;
   textSize: TextSize;
   /** Dark-mode PDF rendering (inverted canvas for night reading). */
   pdfDarkMode: boolean;
@@ -115,6 +117,8 @@ interface UiState {
   /** Open a paper as a tab and scroll to the given page once it loads. */
   requestGoTo: (paperId: string, page: number, query?: string) => void;
   clearGoToRequest: () => void;
+  openSearchOverlay: (scope: "library" | "document") => void;
+  closeSearchOverlay: () => void;
   setTextSize: (size: TextSize) => void;
   togglePdfDarkMode: () => void;
   enterFocusMode: (snapshot: PreFocusState) => void;
@@ -154,6 +158,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   keywordFilter: null,
   scrollToAnnotation: null,
   goToRequest: null,
+  searchOverlayScope: null,
   textSize: loadTextSize(),
   pdfDarkMode: loadBool("hyji:pdf-dark", false),
   focusMode: false,
@@ -229,6 +234,12 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ goToRequest: { paperId, page, query } });
   },
   clearGoToRequest: () => set({ goToRequest: null }),
+  openSearchOverlay: (scope) =>
+    set((s) => ({
+      // Document scope needs an open paper; fall back to the whole library
+      searchOverlayScope: scope === "document" && !s.activePaperId ? "library" : scope,
+    })),
+  closeSearchOverlay: () => set({ searchOverlayScope: null }),
   setTextSize: (size) => {
     localStorage.setItem("hyji:text-size", size);
     set({ textSize: size });

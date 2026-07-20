@@ -31,7 +31,6 @@ export default function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
 
   const {
     sidebarWidth,
@@ -99,7 +98,7 @@ export default function App() {
       onMenuEvent("about", () => setAboutOpen(true)),
       onMenuEvent("shortcuts", () => setShortcutsOpen(true)),
       onMenuEvent("preferences", () => setPreferencesOpen(true)),
-      onMenuEvent("find-paper", () => setSearchOpen(true)),
+      onMenuEvent("find-paper", () => useUiStore.getState().openSearchOverlay("library")),
       onMenuEvent("github", () => shellOpen("https://github.com/inyoungoh-cde/hyji")),
       onMenuEvent("text-size-normal", () => setTextSize("normal")),
       onMenuEvent("text-size-large",  () => setTextSize("large")),
@@ -117,7 +116,7 @@ export default function App() {
       }
       if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
         e.preventDefault();
-        setSearchOpen(true);
+        useUiStore.getState().openSearchOverlay("library");
       }
     };
     document.addEventListener("keydown", handler);
@@ -247,7 +246,7 @@ export default function App() {
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {shortcutsOpen && <KeyboardShortcutsModal onClose={() => setShortcutsOpen(false)} />}
       <PreferencesDialog open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
-      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <GlobalSearch />
     </div>
   );
 }
