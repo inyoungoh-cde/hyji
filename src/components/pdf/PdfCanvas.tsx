@@ -153,10 +153,24 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [pages, setPages] = useState<PageEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const renderedPages = useRef<Map<number, number>>(new Map()); // pageNum -> rendered scale
+  const renderedPages = useRef<Map<number, string>>(new Map()); // pageNum -> "scale@dpr" render key
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());       // outer page wrapper (for observer, scroll, text queries)
   const renderRefs = useRef<Map<number, HTMLDivElement>>(new Map());     // inner div (for imperative canvas/textLayer rendering)
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // devicePixelRatio changes when the window moves between monitors with
+  // different DPI (or the user changes display scaling). The canvas bitmap
+  // was rasterized at the old ratio, so it must be re-rendered — otherwise
+  // the OS stretches it and every page turns blurry. matchMedia on the
+  // current resolution fires once per ratio change; re-registering against
+  // the new ratio keeps listening across multiple monitor hops.
+  const [dpr, setDpr] = useState(() => window.devicePixelRatio || 1);
+  useEffect(() => {
+    const mq = window.matchMedia(`(resolution: ${dpr}dppx)`);
+    const onChange = () => setDpr(window.devicePixelRatio || 1);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [dpr]);
 
   // Load document
   useEffect(() => {
@@ -209,9 +223,11 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const renderPage = useCallback(
     async (pageNum: number) => {
       if (!doc) return;
-      // Skip if already rendered at this scale
-      if (renderedPages.current.get(pageNum) === scale) return;
-      renderedPages.current.set(pageNum, scale);
+      // Skip if already rendered at this scale AND pixel ratio — a dpr
+      // change alone (monitor move) must invalidate the cached bitmap.
+      const renderKey = `${scale}@${window.devicePixelRatio || 1}`;
+      if (renderedPages.current.get(pageNum) === renderKey) return;
+      renderedPages.current.set(pageNum, renderKey);
 
       const container = renderRefs.current.get(pageNum);
       if (!container) return;
@@ -492,11 +508,13 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     },
   }), [pages, doc, renderPage, annotations]);
 
-  // Re-render when scale changes
+  // Re-render when scale or devicePixelRatio changes — the text layer and
+  // highlight overlay are rebuilt inside renderPage (container is cleared),
+  // so they always match the fresh canvas size.
   useEffect(() => {
     renderedPages.current.clear();
     pages.forEach((p) => renderPage(p.pageNum));
-  }, [scale, pages, renderPage]);
+  }, [scale, dpr, pages, renderPage]);
 
   // Restore the last reading position when this document (re)loads,
   // e.g. after switching back to its tab. Only after this runs do scroll

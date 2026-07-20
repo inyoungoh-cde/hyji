@@ -277,6 +277,32 @@ export function PdfViewer() {
     }
   }, []);
 
+  // Focus Mode's contract is "page fits the viewport". Recompute the pdf.js
+  // render scale whenever the viewer resizes (window resize, monitor move,
+  // DPI change) so pages re-render at the exact fit-width value instead of
+  // the old canvas being CSS-stretched into blur. The observer also fires
+  // once on observe, which handles the layout settling after panels hide.
+  useEffect(() => {
+    if (!focusMode) return;
+    const el = viewerRef.current;
+    if (!el) return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (viewerRef.current && pageWidthRef.current) {
+          const w = viewerRef.current.clientWidth;
+          setScale(Math.max(0.25, Math.round((w / pageWidthRef.current) * 100) / 100));
+        }
+      });
+    });
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [focusMode]);
+
   // Print: render pages at high resolution (highlights burned in) and hand
   // them to the system print dialog via a hidden iframe.
   const handlePrint = useCallback(async () => {
