@@ -74,6 +74,20 @@ export function PdfViewer() {
     setCurrentPage(1);
   }, []);
 
+  // Global-search "open at page" requests: fire once the requested paper's
+  // document is loaded (page placeholders exist as soon as totalPages is set).
+  const goToRequest = useUiStore((s) => s.goToRequest);
+  useEffect(() => {
+    if (!goToRequest || goToRequest.paperId !== activePaperId || totalPages === 0) return;
+    const page = Math.min(Math.max(1, goToRequest.page), totalPages);
+    const t = setTimeout(() => {
+      setGoToPage(page);
+      setTimeout(() => setGoToPage(null), 120);
+      useUiStore.getState().clearGoToRequest();
+    }, 250);
+    return () => clearTimeout(t);
+  }, [goToRequest, activePaperId, totalPages]);
+
   // Annotations must load whenever the active paper changes, regardless of
   // TrackerPanel visibility — focus mode and viewer-only layout unmount it,
   // and highlights would otherwise never render (or show the previous paper's).
@@ -405,6 +419,24 @@ export function PdfViewer() {
           useUiStore.getState().closePaperTab(id);
           deletePaper(id);
         }
+      }),
+
+      onMenuEvent("rebuild-search-index", async () => {
+        const { message, ask } = await import("@tauri-apps/plugin-dialog");
+        const papers = usePapersStore.getState().papers;
+        const withPdf = papers.filter((p) => p.pdf_path).length;
+        const confirmed = await ask(
+          `Re-extract and re-index the text of ${withPdf} PDF(s) for full-text search?\nThis runs in the background and may take a while for large libraries.`,
+          { title: "Rebuild Search Index", kind: "info" }
+        );
+        if (!confirmed) return;
+        const { rebuildLibraryIndex } = await import("../../lib/ftsSearch");
+        rebuildLibraryIndex(papers)
+          .then(() => message("Search index rebuilt.", { title: "Rebuild Search Index", kind: "info" }))
+          .catch(async (e) => {
+            const { message: msg } = await import("@tauri-apps/plugin-dialog");
+            await msg(`Rebuild failed: ${String(e)}`, { title: "Rebuild Search Index", kind: "error" });
+          });
       }),
 
       onMenuEvent("import-annotations", async () => {

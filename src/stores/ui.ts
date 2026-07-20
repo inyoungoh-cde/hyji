@@ -93,6 +93,8 @@ interface UiState {
   selectedProjectId: string | null;
   keywordFilter: string | null;
   scrollToAnnotation: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null;
+  /** Pending "open paper at page" request (from global search results). */
+  goToRequest: { paperId: string; page: number } | null;
   textSize: TextSize;
   /** Dark-mode PDF rendering (inverted canvas for night reading). */
   pdfDarkMode: boolean;
@@ -108,6 +110,9 @@ interface UiState {
   setSelectedProject: (id: string | null) => void;
   setKeywordFilter: (keyword: string | null) => void;
   setScrollToAnnotation: (req: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null) => void;
+  /** Open a paper as a tab and scroll to the given page once it loads. */
+  requestGoTo: (paperId: string, page: number) => void;
+  clearGoToRequest: () => void;
   setTextSize: (size: TextSize) => void;
   togglePdfDarkMode: () => void;
   enterFocusMode: (snapshot: PreFocusState) => void;
@@ -146,6 +151,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   selectedProjectId: null,
   keywordFilter: null,
   scrollToAnnotation: null,
+  goToRequest: null,
   textSize: loadTextSize(),
   pdfDarkMode: loadBool("hyji:pdf-dark", false),
   focusMode: false,
@@ -216,6 +222,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSelectedProject: (id) => set({ selectedProjectId: id }),
   setKeywordFilter: (keyword) => set({ keywordFilter: keyword }),
   setScrollToAnnotation: (req) => set({ scrollToAnnotation: req }),
+  requestGoTo: (paperId, page) => {
+    get().setActivePaper(paperId);
+    set({ goToRequest: { paperId, page } });
+  },
+  clearGoToRequest: () => set({ goToRequest: null }),
   setTextSize: (size) => {
     localStorage.setItem("hyji:text-size", size);
     set({ textSize: size });

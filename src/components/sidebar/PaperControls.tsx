@@ -88,9 +88,9 @@ export function PaperControls({
       onMenuEvent("selection-mode", () => onSelectMode(!selectMode)),
       onMenuEvent("export-selected", handleExportSelected),
       onMenuEvent("export-all", handleExportAll),
-      onMenuEvent("find-paper", () => setShowSearch((s) => !s)),
-      // NOTE: "delete-paper" is handled in PdfViewer (which also closes the
-      // paper's tab) — registering it here too fired two confirm dialogs.
+      // NOTE: "find-paper" opens the global search overlay (App.tsx) as of
+      // v1.0.4; the sidebar filter stays reachable via the ⌕ button.
+      // "delete-paper" is handled in PdfViewer (which also closes the tab).
     ];
     return () => unsubs.forEach((fn) => fn());
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,16 +108,7 @@ export function PaperControls({
     return () => document.removeEventListener("keydown", handler);
   }, [selectMode, onSelectMode]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === "F") {
-        e.preventDefault();
-        setShowSearch((s) => !s);
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, []);
+  // Ctrl+Shift+F is owned by the global search overlay (App.tsx).
 
   return (
     <div className="flex flex-col">

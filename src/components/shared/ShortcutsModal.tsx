@@ -29,7 +29,7 @@ const SHORTCUT_CATEGORIES: { label: string; shortcuts: [string, string][] }[] = 
     label: "PDF",
     shortcuts: [
       ["Ctrl+F", "Find in PDF"],
-      ["Ctrl+Shift+F", "Find Paper"],
+      ["Ctrl+Shift+F", "Search library (full-text)"],
       ["Ctrl+=", "Zoom In"],
       ["Ctrl+-", "Zoom Out"],
       ["Ctrl+0", "Fit Width"],

@@ -2,6 +2,17 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.4] - 2026-07-20
+
+### Added
+
+- **Library-wide full-text search** — `Ctrl+Shift+F` (or Edit → Find Paper) opens a Spotlight-style search over your whole library: paper titles/authors/venues *and the actual text of every PDF*. Results show the matching page with a highlighted snippet; Enter or click opens the paper at that page in a tab. Works for Korean and English (SQLite FTS5 trigram index; 1–2 character queries use a substring scan so short Korean terms still match).
+- **Background indexing** — PDFs are indexed automatically a few seconds after launch and whenever new papers are imported; no setup. Tools → Rebuild Search Index… re-extracts everything from scratch.
+
+### Changed
+
+- `Ctrl+Shift+F` now opens the global search overlay; the sidebar paper filter remains available via the ⌕ button in the PAPERS section.
+
 ## [1.0.3] - 2026-07-20
 
 ### Added

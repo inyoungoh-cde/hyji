@@ -148,6 +148,7 @@ pub fn run() {
                 .text("extract-meta", "Extract PDF Metadata")
                 .text("regen-keywords", "Regenerate Keywords")
                 .text("import-annotations", "Import Annotations from PDF...")
+                .text("rebuild-search-index", "Rebuild Search Index...")
                 .separator()
                 .text("db-backup", "Database Backup...")
                 .text("db-restore", "Restore from Backup...")

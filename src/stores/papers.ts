@@ -72,6 +72,9 @@ export const usePapersStore = create<PapersState>((set, get) => ({
   deletePaper: async (id) => {
     const db = await getDb();
     await db.execute("DELETE FROM papers WHERE id = ?", [id]);
+    // Full-text index rows aren't covered by FK cascades (virtual table)
+    const { deletePaperIndex } = await import("../lib/ftsSearch");
+    await deletePaperIndex(id).catch(() => undefined);
     await get().fetchPapers();
     markDbDirty();
   },

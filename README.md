@@ -51,6 +51,8 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Export dialog** — Choose output format (LaTeX / RIS / Word / CSV / clipboard), citation style (IEEE / ACS / Nature / APA / MLA), journal name format (full / abbreviated), and starting number. Live preview included.
 
+- **Full-text search** — Ctrl+Shift+F searches your entire library: metadata *and* the text inside every PDF (Korean and English), with page-level results that jump straight to the match
+
 - **Project Tree** — Organize papers into collapsible folders, drag to reorder, inline rename with F2
 
 - **Keyword Graph** — D3 force-directed graph of keyword co-occurrence; click a node to filter papers
@@ -160,6 +162,10 @@ Please keep PRs focused — one feature or fix per PR.
 ---
 
 ## Changelog
+
+### v1.0.4 (Jul 2026)
+- Library-wide full-text search (Ctrl+Shift+F): searches titles *and* the text inside every PDF (Korean + English), jumps to the matching page
+- Automatic background indexing; Tools → Rebuild Search Index
 
 ### v1.0.3 (Jul 2026)
 - Underline & strikeout text markup (4 colors) — rendered, printed, and exported as standard PDF annotations

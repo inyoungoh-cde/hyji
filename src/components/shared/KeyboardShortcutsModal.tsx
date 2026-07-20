@@ -31,7 +31,7 @@ const GROUPS: ShortcutGroup[] = [
       { label: "Import PDF", keys: ["Ctrl", "O"] },
       { label: "Smart Paste (BibTeX / arXiv)", keys: ["Ctrl", "N"] },
       { label: "New Project folder", keys: ["Ctrl", "Shift", "N"] },
-      { label: "Find paper in sidebar", keys: ["Ctrl", "Shift", "F"] },
+      { label: "Search library (titles + PDF text)", keys: ["Ctrl", "Shift", "F"] },
       { label: "Rename selected item", keys: ["F2"] },
       { label: "Delete paper", keys: ["Delete"] },
       { label: "Exit select mode", keys: ["Esc"] },

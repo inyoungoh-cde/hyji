@@ -9,6 +9,8 @@ import { TrackerPanel } from "./components/layout/TrackerPanel";
 import { AboutModal } from "./components/shared/AboutModal";
 import { KeyboardShortcutsModal } from "./components/shared/KeyboardShortcutsModal";
 import { PreferencesDialog } from "./components/shared/PreferencesDialog";
+import { GlobalSearch } from "./components/shared/GlobalSearch";
+import { ensureLibraryIndexed } from "./lib/ftsSearch";
 import { useUiStore } from "./stores/ui";
 import { usePapersStore } from "./stores/papers";
 import { useProjectsStore } from "./stores/projects";
@@ -29,6 +31,7 @@ export default function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const {
     sidebarWidth,
@@ -75,6 +78,19 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paperIdKey]);
 
+  // Full-text search index follows the paper set too — new/changed PDFs are
+  // indexed in the background a few seconds after the library settles.
+  useEffect(() => {
+    if (papers.length === 0) return;
+    const t = setTimeout(() => {
+      ensureLibraryIndexed(papers).catch((e) =>
+        console.warn("[hyji fts] background indexing failed:", e)
+      );
+    }, 4000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paperIdKey]);
+
   // Menu events: toggle panels + modals + text size
   useEffect(() => {
     const unsubs = [
@@ -83,6 +99,7 @@ export default function App() {
       onMenuEvent("about", () => setAboutOpen(true)),
       onMenuEvent("shortcuts", () => setShortcutsOpen(true)),
       onMenuEvent("preferences", () => setPreferencesOpen(true)),
+      onMenuEvent("find-paper", () => setSearchOpen(true)),
       onMenuEvent("github", () => shellOpen("https://github.com/inyoungoh-cde/hyji")),
       onMenuEvent("text-size-normal", () => setTextSize("normal")),
       onMenuEvent("text-size-large",  () => setTextSize("large")),
@@ -97,6 +114,10 @@ export default function App() {
       if (e.ctrlKey && e.key === "/") {
         e.preventDefault();
         setShortcutsOpen(true);
+      }
+      if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
+        e.preventDefault();
+        setSearchOpen(true);
       }
     };
     document.addEventListener("keydown", handler);
@@ -116,7 +137,6 @@ export default function App() {
       "selection-mode": "sidebar",
       "export-selected": "sidebar",
       "export-all": "sidebar",
-      "find-paper": "sidebar",
       "keyword-graph": "sidebar",
       "expand-metadata": "tracker",
     };
@@ -227,6 +247,7 @@ export default function App() {
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {shortcutsOpen && <KeyboardShortcutsModal onClose={() => setShortcutsOpen(false)} />}
       <PreferencesDialog open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }
