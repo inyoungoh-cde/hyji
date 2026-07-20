@@ -1,6 +1,6 @@
 [package]
 name = "hyji"
-version = "1.0.5"
+version = "1.0.6"
 description = "Highlight Your Journey of Insights — Desktop research hub for academic papers"
 authors = ["HYJI"]
 edition = "2021"

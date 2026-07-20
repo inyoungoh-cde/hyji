@@ -57,7 +57,7 @@ export function GlobalSearch() {
     if (!q || scopedToDoc) return [];
     return papers
       .filter((p) =>
-        [p.title, p.authors, p.venue, p.summary]
+        [p.title, p.authors, p.venue, p.summary, p.differentiation, p.questions, p.abstract_text]
           .some((f) => (f ?? "").toLowerCase().includes(q))
       )
       .slice(0, 6);

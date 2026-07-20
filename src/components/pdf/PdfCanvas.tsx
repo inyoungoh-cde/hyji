@@ -65,6 +65,68 @@ export interface PdfCanvasHandle {
 // the user was reading. Session-scoped by design (not persisted).
 const scrollMemory = new Map<string, number>();
 
+// ── Dark-mode image regions ──────────────────────────────────────────────────
+// The page canvas is CSS-inverted in dark mode, which would render photos and
+// figures as negatives. Walk the page's operator list tracking the transform
+// stack; every painted bitmap occupies the unit square under the current ctm.
+// The resulting rects get counter-inverting backdrop-filter overlays.
+type Mat = [number, number, number, number, number, number];
+const MAT_IDENTITY: Mat = [1, 0, 0, 1, 0, 0];
+
+function matMul(m1: Mat, m2: Mat): Mat {
+  return [
+    m1[0] * m2[0] + m1[2] * m2[1],
+    m1[1] * m2[0] + m1[3] * m2[1],
+    m1[0] * m2[2] + m1[2] * m2[3],
+    m1[1] * m2[2] + m1[3] * m2[3],
+    m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+    m1[1] * m2[4] + m1[3] * m2[5] + m1[5],
+  ];
+}
+
+function computeImageRegions(
+  opList: { fnArray: number[]; argsArray: unknown[] },
+  viewport: { convertToViewportPoint: (x: number, y: number) => number[] }
+): Array<{ x: number; y: number; w: number; h: number }> {
+  const OPS = pdfjsLib.OPS as Record<string, number>;
+  const stack: Mat[] = [];
+  let ctm: Mat = MAT_IDENTITY;
+  const regions: Array<{ x: number; y: number; w: number; h: number }> = [];
+
+  for (let i = 0; i < opList.fnArray.length; i++) {
+    const fn = opList.fnArray[i];
+    const args = opList.argsArray[i] as unknown[] | null;
+    if (fn === OPS.save) {
+      stack.push(ctm);
+    } else if (fn === OPS.restore) {
+      ctm = stack.pop() ?? MAT_IDENTITY;
+    } else if (fn === OPS.transform) {
+      ctm = matMul(ctm, args as unknown as Mat);
+    } else if (fn === OPS.paintFormXObjectBegin) {
+      stack.push(ctm);
+      const m = args?.[0] as Mat | null;
+      if (m) ctm = matMul(ctm, m);
+    } else if (fn === OPS.paintFormXObjectEnd) {
+      ctm = stack.pop() ?? MAT_IDENTITY;
+    } else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject) {
+      const pts = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([ux, uy]) => {
+        const x = ctm[0] * ux + ctm[2] * uy + ctm[4];
+        const y = ctm[1] * ux + ctm[3] * uy + ctm[5];
+        return viewport.convertToViewportPoint(x, y);
+      });
+      const xs = pts.map((p) => p[0]);
+      const ys = pts.map((p) => p[1]);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      const w = Math.max(...xs) - x;
+      const h = Math.max(...ys) - y;
+      // Skip tiny bitmaps (bullets, icons) — inverting those is harmless
+      if (w >= 14 && h >= 14) regions.push({ x, y, w, h });
+    }
+  }
+  return regions;
+}
+
 export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function PdfCanvas({
   filePath,
   scale,
@@ -177,6 +239,18 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       const ctx = canvas.getContext("2d")!;
       ctx.scale(dpr, dpr);
       await page.render({ canvasContext: ctx, viewport } as any).promise;
+
+      // Dark-mode: counter-invert overlays over bitmap images so photos and
+      // figures keep natural colors (CSS shows them only in .hyji-pdf-dark).
+      try {
+        const opList = await page.getOperatorList();
+        for (const r of computeImageRegions(opList, viewport)) {
+          const div = document.createElement("div");
+          div.className = "hyji-img-region";
+          div.style.cssText = `position:absolute;left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;pointer-events:none;`;
+          container.appendChild(div);
+        }
+      } catch { /* best-effort — worst case images stay inverted */ }
 
       // Text layer — use pdfjs TextLayer class for accurate span sizing and positioning
       const textLayerDiv = document.createElement("div");

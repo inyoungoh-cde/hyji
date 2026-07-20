@@ -89,6 +89,14 @@ body,
 .hyji-pdf-dark .hyji-pdf-pages > div {
   background: #1d2025;
 }
+/* Bitmap images: counter-invert the backdrop so photos/figures stay natural */
+.hyji-img-region {
+  display: none;
+}
+.hyji-pdf-dark .hyji-img-region {
+  display: block;
+  backdrop-filter: invert(1) hue-rotate(180deg) contrast(1.05);
+}
 
 /* Tab strip: near-invisible 3px scrollbar so overflowing tabs stay tidy */
 .hyji-tab-scroll::-webkit-scrollbar {

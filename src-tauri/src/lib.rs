@@ -15,6 +15,15 @@ use backup::{
 // so paths queued before the webview finishes loading are never lost.
 pub struct PendingOpenFile(pub Mutex<Vec<String>>);
 
+/// Handle to the File > Export Selected... item so the frontend can
+/// enable/disable it as the selection changes.
+pub struct ExportSelectedItem(pub tauri::menu::MenuItem<tauri::Wry>);
+
+#[tauri::command]
+fn set_export_selected_enabled(state: State<'_, ExportSelectedItem>, enabled: bool) {
+    let _ = state.0.set_enabled(enabled);
+}
+
 #[tauri::command]
 fn take_pending_open_files(state: State<'_, PendingOpenFile>) -> Vec<String> {
     state
@@ -76,6 +85,7 @@ pub fn run() {
             commands::update_paper,
             commands::delete_paper,
             commands::http_get_text,
+            set_export_selected_enabled,
             take_pending_open_files,
             get_backup_config,
             set_backup_config,
@@ -99,7 +109,14 @@ pub fn run() {
             window.set_icon(icon)?;
 
             // Create menu
-            use tauri::menu::{MenuBuilder, SubmenuBuilder};
+            use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+
+            // Kept as a handle so the frontend can gray it out while nothing
+            // is selected (starts disabled — no selection at launch).
+            let export_selected_item =
+                MenuItemBuilder::with_id("export-selected", "Export Selected...")
+                    .enabled(false)
+                    .build(app)?;
 
             let file_menu = SubmenuBuilder::new(app, "File")
                 .text("new-project", "New Project\tCtrl+Shift+N")
@@ -109,11 +126,13 @@ pub fn run() {
                 .text("print-pdf", "Print...\tCtrl+P")
                 .separator()
                 .text("selection-mode", "Selection Mode\tCtrl+Shift+S")
-                .text("export-selected", "Export Selected...")
+                .item(&export_selected_item)
                 .text("export-all", "Export All...")
                 .separator()
                 .quit()
                 .build()?;
+
+            app.manage(ExportSelectedItem(export_selected_item));
 
             let edit_menu = SubmenuBuilder::new(app, "Edit")
                 .undo()

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { usePapersStore } from "../../stores/papers";
 import { onMenuEvent } from "../../lib/menuEvents";
 import { ExportDialog } from "../shared/ExportDialog";
@@ -109,6 +110,16 @@ export function PaperControls({
   }, [selectMode, onSelectMode]);
 
   // Ctrl+Shift+F is owned by the global search overlay (App.tsx).
+
+  // Gray out File > Export Selected... while nothing is selected.
+  // Disabled on unmount too: with the sidebar hidden there is no selection.
+  useEffect(() => {
+    const enabled = selectMode && selectedIds.size > 0;
+    invoke("set_export_selected_enabled", { enabled }).catch(() => undefined);
+  }, [selectMode, selectedIds]);
+  useEffect(() => () => {
+    invoke("set_export_selected_enabled", { enabled: false }).catch(() => undefined);
+  }, []);
 
   return (
     <div className="flex flex-col">

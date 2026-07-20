@@ -2,6 +2,17 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.6] - 2026-07-20
+
+### Added
+
+- **Dark mode keeps figures natural** — photos and figures are no longer shown as negatives in PDF dark mode: HYJI locates every bitmap image on the page (via the render operator list) and counter-inverts exactly those regions, so text reads light-on-dark while figures keep their true colors.
+- **Search covers your notes** — the library search overlay now also matches Summary, Differentiation, Questions, and Abstract text, not just titles/authors/venues.
+
+### Fixed
+
+- **File → Export Selected…** is now grayed out when nothing is selected (previously it opened an explanatory dialog).
+
 ## [1.0.5] - 2026-07-20
 
 ### Added

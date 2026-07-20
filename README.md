@@ -163,6 +163,11 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v1.0.6 (Jul 2026)
+- Dark mode now counter-inverts figures/photos so they keep natural colors
+- Library search also matches your notes (Summary/Differentiation/Questions/Abstract)
+- Export Selected… menu item grays out when nothing is selected
+
 ### v1.0.5 (Jul 2026)
 - Fetch metadata online: one click looks the paper up on Crossref/arXiv (DOI/arXiv ID auto-detected from the PDF) with a confirm-before-overwrite diff
 
