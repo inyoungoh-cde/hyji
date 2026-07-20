@@ -32,6 +32,12 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      # Display version drops a trailing ".0" patch (tag v2.0.0 → release "HYJI v2.0")
+      - name: Compute display version
+        id: ver
+        shell: bash
+        run: echo "display=${GITHUB_REF_NAME%.0}" >> "$GITHUB_OUTPUT"
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -40,7 +46,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: HYJI ${{ github.ref_name }}
+          releaseName: HYJI ${{ steps.ver.outputs.display }}
           releaseBody: |
             ## What's new
             See [CHANGELOG.md](https://github.com/inyoungoh-cde/hyji/blob/main/CHANGELOG.md) for details.

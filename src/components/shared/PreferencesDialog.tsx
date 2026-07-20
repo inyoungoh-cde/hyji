@@ -13,6 +13,7 @@ import {
   saveStartupLayout,
   type StartupLayout,
 } from "../../stores/ui";
+import { useNetworkStore } from "../../stores/network";
 
 const LAYOUT_OPTIONS: { value: StartupLayout; label: string; hint: string }[] = [
   { value: "remember", label: "Remember last layout", hint: "Panels reopen exactly as you left them" },
@@ -47,6 +48,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   });
   const [saving, setSaving] = useState(false);
   const [startupLayout, setStartupLayout] = useState<StartupLayout>(loadStartupLayout);
+  const offlineMode = useNetworkStore((s) => s.offlineMode);
+  const setOfflineMode = useNetworkStore((s) => s.setOfflineMode);
 
   const handleLayoutChange = (layout: StartupLayout) => {
     setStartupLayout(layout);
@@ -138,6 +141,30 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                 </label>
               ))}
             </div>
+          </Section>
+
+          <Section label="Network & privacy">
+            <label className="flex items-start gap-2 text-body text-text-primary cursor-pointer">
+              <input
+                type="checkbox"
+                checked={offlineMode}
+                onChange={(e) => setOfflineMode(e.target.checked)}
+                className="accent-[#58a6ff] mt-0.5"
+              />
+              <span>
+                Offline mode — disable all online features
+                <span className="block text-caption text-text-tertiary">
+                  Grays out "Fetch metadata". HYJI then makes no network requests at all.
+                </span>
+              </span>
+            </label>
+            <p className="mt-2 text-caption text-text-tertiary leading-relaxed">
+              HYJI's only online feature is the metadata lookup, and it runs only when
+              you click it. It sends the paper's DOI or arXiv ID — nothing else — directly
+              to <span className="font-mono">api.crossref.org</span> or{" "}
+              <span className="font-mono">export.arxiv.org</span> (both non-profit).
+              Your PDFs, notes, and library never leave this computer.
+            </p>
           </Section>
 
           <Section label="Auto-backup">

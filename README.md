@@ -47,7 +47,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Highlights, Underlines & Memos** — highlight/underline/strikeout in 4 colors, margin memos, and true two-way interop: "Save annotations to PDF" writes standard annotations that Adobe Acrobat and other viewers can display and edit, and annotations made elsewhere can be imported into HYJI as editable ones (Tools → Import Annotations from PDF).
 
-- **Smart Paste & metadata lookup** — Paste BibTeX, citation string, arXiv ID, or RIS — HYJI auto-detects the format and parses all fields. Or click "Fetch metadata" to look the paper up on Crossref/arXiv from its DOI/arXiv ID (auto-detected in the PDF), with a confirm-before-overwrite diff.
+- **Smart Paste & metadata lookup** — Paste BibTeX, citation string, arXiv ID, or RIS — HYJI auto-detects the format and parses all fields. Or click "Fetch metadata" to look the paper up on Crossref/arXiv from its DOI/arXiv ID (auto-detected in the PDF), with a confirm-before-overwrite diff. Strictly user-initiated — see [Privacy & Network Policy](#privacy--network-policy).
 
 - **Export dialog** — Choose output format (LaTeX / RIS / Word / CSV / clipboard), citation style (IEEE / ACS / Nature / APA / MLA), journal name format (full / abbreviated), and starting number. Live preview included.
 
@@ -61,13 +61,24 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Dashboard** — Notion-style home screen with recent papers, reading stats, and quick actions
 
-- **100% Local** — SQLite database on your disk. No account, no cloud, no tracking. Works offline forever.
+- **100% Local** — SQLite database on your disk. No account, no cloud, no tracking. Works offline forever — and an **Offline mode** switch in Preferences guarantees it.
+
+---
+
+## Privacy & Network Policy
+
+HYJI is local-first and makes **no automatic network requests**. In full:
+
+- **The only online feature is the metadata lookup** ("🌐 Fetch metadata"), and it runs only when you click it. It sends the paper's **DOI or arXiv ID — nothing else** — directly to `api.crossref.org` (Crossref, the non-profit DOI registry) or `export.arxiv.org` (arXiv, Cornell University) and reads back the public bibliographic record. These two domains are hard-coded as an allowlist in the Rust backend; the app cannot request any other host.
+- **Your PDFs, notes, highlights, and library never leave your computer.** There is no account, no telemetry, no proxy server — requests go straight from your machine to the non-profit source.
+- **Before the first lookup**, a one-time dialog explains exactly what will be sent; Cancel sends nothing.
+- **Offline mode** (Tools → Preferences… → Network & privacy) disables online features entirely — with it on, HYJI makes zero network requests.
 
 ---
 
 ## Download
 
-> **Windows only in v1.0. macOS / Linux planned.**
+> **Windows only for now. macOS / Linux planned.**
 
 **[⬇ Download latest installer (.msi)](https://github.com/inyoungoh-cde/hyji/releases/latest)**
 
@@ -75,7 +86,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 2. Double-click → Next → Next → Install → Finish
 3. Launch HYJI from the Start menu
 
-HYJI checks for updates automatically on launch.
+To update, download the newest installer from the Releases page — in line with the privacy policy above, HYJI does not phone home to check for updates.
 
 ---
 
@@ -163,31 +174,39 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
-### v1.0.7 (Jul 2026)
+> Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
+
+### v2.0 (Jul 2026)
+- Network & privacy section in Preferences with an **Offline mode** switch — turn it on and HYJI makes no network requests at all
+- One-time notice before the first metadata lookup explaining exactly what is sent (only the DOI/arXiv ID, directly to Crossref/arXiv)
+- Online requests now identify the app by its GitHub URL only (personal email removed from User-Agent)
+- Version numbering simplified (this release; installer build version is 2.0.0)
+
+### v1.7 (Jul 2026)
 - Drag-selection highlight is visible again (previous bleed mitigation over-suppressed it)
 
-### v1.0.6 (Jul 2026)
+### v1.6 (Jul 2026)
 - Dark mode now counter-inverts figures/photos so they keep natural colors
 - Library search also matches your notes (Summary/Differentiation/Questions/Abstract)
 - Export Selected… menu item grays out when nothing is selected
 
-### v1.0.5 (Jul 2026)
+### v1.5 (Jul 2026)
 - Fetch metadata online: one click looks the paper up on Crossref/arXiv (DOI/arXiv ID auto-detected from the PDF) with a confirm-before-overwrite diff
 
-### v1.0.4 (Jul 2026)
+### v1.4 (Jul 2026)
 - Library-wide full-text search (Ctrl+Shift+F): searches titles *and* the text inside every PDF (Korean + English), jumps to the matching page
 - Automatic background indexing; Tools → Rebuild Search Index
 
-### v1.0.3 (Jul 2026)
+### v1.3 (Jul 2026)
 - Underline & strikeout text markup (4 colors) — rendered, printed, and exported as standard PDF annotations
 - Tools → Import Annotations from PDF: highlights/underlines/notes made in Adobe & other viewers become editable HYJI annotations
 
-### v1.0.2 (Jul 2026)
+### v1.2 (Jul 2026)
 - PDF dark mode (Ctrl+D) — inverted night reading with true-color highlights
 - Abstract field in tracker metadata; DOI ↗ opens doi.org; backup-on-exit for dirty databases
 - About dialog shows the real app version
 
-### v1.0.1 (Jul 2026)
+### v1.1 (Jul 2026)
 - Multi-tab PDF viewing with per-tab zoom/position memory and session restore; Ctrl+W closes a tab
 - Single-instance app — PDFs opened from Explorer land as tabs in the running window
 - CJK/CID font rendering fixed (Korean/Japanese/Chinese PDFs no longer show empty text)
@@ -195,8 +214,8 @@ Please keep PRs focused — one feature or fix per PR.
 - RIS export with correct author splitting; File → Print… (Ctrl+P); startup layout preference (viewer-only mode)
 - PDFs on any drive (D:, USB, network) now open; many interaction fixes (panel-hidden menu items, duplicate imports, duplicate dialogs, Focus-mode dead-ends)
 
-### v1.0.0 (Apr 2026)
-- Official release — all features from v0.1.x are now production-ready
+### v1.0 (Apr 2026)
+- Official release — all features from v0.x are now production-ready
 - New app icon with improved visibility at small sizes
 - PDF internal reference click with return-to-position and extended flash animation (3.5s)
 - Stored highlights now fill word-gap spaces (no striped appearance)
@@ -204,7 +223,7 @@ Please keep PRs focused — one feature or fix per PR.
 - Tools menu: added Reset to Blank (Clear All Data) and moved Preferences to the bottom
 - File menu: Preferences removed (accessible only via Tools)
 
-### v0.1.7 (Apr 2026)
+### v0.8 (Apr 2026)
 - New Export dialog: pick LaTeX `.bib` / Word `.txt` / CSV / Clipboard, citation style (IEEE / ACS / Nature / APA / MLA), starting number, and journal-name abbreviation format — with live preview
 - RIS import (drag a `.ris` file or paste RIS text into Smart Paste)
 - Reference types: article / conference / book / book chapter / thesis / misc with publisher, edition, chapter, pages, DOI fields; type-aware BibTeX export
@@ -212,34 +231,34 @@ Please keep PRs focused — one feature or fix per PR.
 - Focus Mode (Ctrl+L) — hides sidebar and tracker, fits PDF width; Esc or Ctrl+L exits
 - Auto-backup of the SQLite database with configurable folder, interval, "only on change", and keep-last-N rotation; configured in File → Preferences…
 
-### v0.1.6 (Apr 2026)
+### v0.7 (Apr 2026)
 - PDF file association — set HYJI as the default `.pdf` handler in Windows and double-click any PDF to launch HYJI; the file is auto-imported as an unassigned paper, ready to read and annotate
 - Visible scrollbars — bumped from 6px/grey to 8px/white (40 %) across sidebar, tracker, PDF viewer, and popup menus
 - Right-click "Move to" menu no longer gets cut off when there are many projects: scrolls when too tall, flips upward when near the window bottom
 
-### v0.1.5 (Apr 2026)
+### v0.6 (Apr 2026)
 - Fixed keyword graph shaking while typing in note fields (D3 simulation was restarting on every keystroke due to unstable memo dependencies)
 
-### v0.1.4 (Apr 2026)
+### v0.5 (Apr 2026)
 - Auto context menu after text drag-select — no right-click needed
 - Menu clamped to viewport, selection cleared on dismiss
 - Garbled keyword extraction fixed: hyphenated PDF titles and concatenated text no longer produce word-fragment keywords
 
-### v0.1.3 (Apr 2026)
+### v0.4 (Apr 2026)
 - Fixed XMP keyword extraction — keywords stored only in XMP metadata (Oxford Academic, JCDE journals) now correctly extracted; root cause was pdfjs detaching the ArrayBuffer before the XMP scan could run
 
-### v0.1.2 (Apr 2026)
+### v0.3 (Apr 2026)
 - Fixed keyword duplication on paper import (race condition between two concurrent keyword-extraction effects)
 - Fixed keyword graph nodes clumping at center after Regenerate Keywords
 - Added Import PDF icon button to Projects header for one-click access
 
-### v0.1.1 (Apr 2026)
+### v0.2 (Apr 2026)
 - Improved Questions section color — more vivid violet for better readability
 - Added text size options (Default / Large / X-Large) in View menu
 - Converted all font sizes to rem units for consistent scaling
 - Connected About HYJI and Help menu GitHub links to repository
 
-### v0.1.0 (Apr 2026)
+### v0.1 (Apr 2026)
 - Initial release — PDF viewer, highlights, bidirectional notes, Smart Paste, keyword graph, dashboard, BibTeX export
 
 [See full changelog →](./CHANGELOG.md)

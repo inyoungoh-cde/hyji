@@ -2,13 +2,30 @@
 
 All notable changes to HYJI will be documented in this file.
 
-## [1.0.7] - 2026-07-20
+> **Versioning note (2.0):** releases before 2.0 were renumbered to a simpler two-part
+> scheme — `1.0.x` became `1.x` and `0.1.x` became `0.(x+1)` (so 0.1.0→0.1 … 0.1.7→0.8,
+> 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
+> installer files and download links are unchanged.
+
+## [2.0] - 2026-07-20
+
+### Added
+
+- **Offline mode** — Preferences gains a **Network & privacy** section with an "Offline mode" switch. Turning it on grays out "Fetch metadata" and guarantees HYJI makes no network requests at all. The section also states HYJI's network policy in one paragraph: the only online feature is the user-initiated metadata lookup, which sends a paper's DOI/arXiv ID — nothing else — directly to `api.crossref.org` or `export.arxiv.org`.
+- **First-lookup notice** — the first time you click "Fetch metadata", a one-time dialog explains exactly what will be sent and where, and that PDFs, notes, and your library never leave the computer. Confirm once and it never asks again; Cancel sends nothing.
+
+### Changed
+
+- **Versioning simplified** — release numbers move to a two-part scheme (see note above); this release is **2.0**. The Windows build/installer version is `2.0.0` (installers require three-part versions).
+- **Cleaner request signature** — online lookups now identify the app by its GitHub repository URL only; the developer's personal email was removed from the `User-Agent`.
+
+## [1.7] - 2026-07-20 *(git tag v1.0.7)*
 
 ### Fixed
 
 - **Text-selection highlight visible again while dragging** — the previous whitespace-bleed mitigation (span marking by `scaleX` threshold) over-matched normal word spans, making drag selection nearly invisible in many PDFs. Selection suppression now applies only to whitespace-only spans: you see what you select, and the full-line flash from stretched space spans stays suppressed.
 
-## [1.0.6] - 2026-07-20
+## [1.6] - 2026-07-20 *(git tag v1.0.6)*
 
 ### Added
 
@@ -19,14 +36,14 @@ All notable changes to HYJI will be documented in this file.
 
 - **File → Export Selected…** is now grayed out when nothing is selected (previously it opened an explanatory dialog).
 
-## [1.0.5] - 2026-07-20
+## [1.5] - 2026-07-20 *(git tag v1.0.5)*
 
 ### Added
 
 - **Fetch metadata online** — a "🌐 Fetch metadata (DOI / arXiv)" button in the tracker's metadata section looks the paper up on Crossref (falling back to the arXiv API). The DOI or arXiv ID is taken from the paper's DOI field or extracted automatically from the first pages of the PDF. A confirmation dialog shows exactly which fields would change (old value struck through) — untick anything you want to keep, then Apply. Fills title, authors, year, venue (normalized), type, publisher, pages, DOI, abstract, and link.
 - Requests go directly from your machine with a polite `User-Agent` (no account, no proxy, no tracking); the feature simply does nothing when offline. This is a deliberate, narrow exception to the "no web scraping" non-goal — lookup only, never bulk downloading.
 
-## [1.0.4] - 2026-07-20
+## [1.4] - 2026-07-20 *(git tag v1.0.4)*
 
 ### Added
 
@@ -38,19 +55,19 @@ All notable changes to HYJI will be documented in this file.
 
 - `Ctrl+F` / Edit → Find in PDF now opens the unified overlay (document scope) instead of the small inline bar; the inline bar still appears for stepping through matches after a jump. The sidebar paper filter remains available via the ⌕ button in the PAPERS section.
 
-## [1.0.3] - 2026-07-20
+## [1.3] - 2026-07-20 *(git tag v1.0.3)*
 
 ### Added
 
 - **Underline & strikeout** — the selection context menu now offers Underline and Strikeout rows next to Highlight, in the same four colors. They render as clean lines in the viewer, survive printing, and export to PDF as standard `/Underline` and `/StrikeOut` annotations that other viewers understand.
 - **Import annotations from other viewers** — Tools → Import Annotations from PDF… finds highlights, underlines, strikeouts, and sticky notes created in Adobe Acrobat (or any other viewer) and imports them into HYJI as native, editable annotations. Comments on highlights and sticky-note text become HYJI memos. After a confirmation, the originals are moved out of the PDF file so nothing displays twice — "Save annotations to PDF" writes everything back in standard form.
 
-## [1.0.2] - 2026-07-20
+## [1.2] - 2026-07-20 *(git tag v1.0.2)*
 
 ### Added
 
 - **PDF dark mode** — `Ctrl+D`, View → PDF Dark Mode, or the toolbar moon button inverts the rendered page for night reading (soft 92% inversion so whites don't glare). Highlight colors, text selection, and search matches keep their true colors over the darkened page. The setting persists across sessions.
-- **Abstract in the tracker panel** — the abstract stored since v0.1.7 finally has a UI: an editable Abstract field in the metadata section.
+- **Abstract in the tracker panel** — the abstract stored since v0.8 finally has a UI: an editable Abstract field in the metadata section.
 - **DOI quick-open** — a `↗` button next to the DOI field opens the paper on doi.org in the system browser.
 - **Backup on exit** — if auto-backup is enabled and the database changed since the last backup, HYJI takes one final backup as it closes (the interval timer alone could miss recent edits).
 
@@ -58,7 +75,7 @@ All notable changes to HYJI will be documented in this file.
 
 - **About dialog version** — now read from the app manifest at runtime; it was hardcoded and still showed "1.0.0" after updates.
 
-## [1.0.1] - 2026-07-20
+## [1.1] - 2026-07-20 *(git tag v1.0.1)*
 
 ### Added
 
@@ -83,11 +100,11 @@ All notable changes to HYJI will be documented in this file.
 - **Stale search state across tabs** — The in-PDF search query and match count reset when switching tabs.
 - **RIS field integrity** — Newlines inside abstracts no longer produce malformed RIS records.
 
-## [1.0.0] - 2026-04-30
+## [1.0] - 2026-04-30 *(git tag v1.0.0)*
 
 ### Official Release
 
-- All features from v0.1.0 through v0.1.7 are now production-ready
+- All features from v0.1 through v0.8 are now production-ready
 - New app icon with improved visibility at small sizes
 - PDF internal reference click with return-to-position and extended flash animation (3.5s)
 - Updated README with "Why HYJI?" section highlighting key differentiators
@@ -102,7 +119,7 @@ All notable changes to HYJI will be documented in this file.
 - **File menu** — Removed "Preferences…" from File menu; now only accessible via Tools menu
 - **Tools menu** — Added "Reset to Blank (Clear All Data)…" for wiping the database back to a blank state; Preferences moved to the very bottom of the menu
 
-## [0.1.7] - 2026-04-29
+## [0.8] - 2026-04-29 *(git tag v0.1.7)*
 
 ### Added
 - **Export dialog with citation styles** — File → Export Selected… / Export All… opens a dialog where you pick output format (LaTeX `.bib`, Word references `.txt`, CSV, or Copy to clipboard), citation style (IEEE / ACS / Nature / APA / MLA), starting number (or no numbers), and journal-name format (full / abbr with dots / abbr no dots). Live preview updates as you change options.
@@ -116,7 +133,7 @@ All notable changes to HYJI will be documented in this file.
 - **File menu restructure** — "Export Selection Mode" → "Selection Mode" (Ctrl+Shift+S); the three "Export All (.bib / Word / CSV)" items collapse into "Export Selected…" and "Export All…", both routed to the new export dialog. Added "Preferences…" above Exit (and a duplicate in Tools).
 - **View menu** — Added "Focus Mode" (Ctrl+L) and "Expand Metadata" (Ctrl+M) entries to match what the keyboard shortcuts already supported.
 
-## [0.1.6] - 2026-04-29
+## [0.7] - 2026-04-29 *(git tag v0.1.6)*
 
 ### Added
 - **PDF file association — open PDFs directly from Windows Explorer** — Setting HYJI as the default `.pdf` handler now works as expected: double-clicking any PDF launches HYJI and auto-imports the file as an unassigned paper. Backend stashes the launch-time argv path in a `PendingOpenFile` state; the frontend invokes `take_pending_open_file` on mount, runs `extractPdfMeta` for the title, and creates the paper with `project_id = null` so it lands under the existing **Unassigned** section. Drag it into a project folder later when you're ready.
@@ -125,12 +142,12 @@ All notable changes to HYJI will be documented in this file.
 - **Sidebar/menu scrollbars were nearly invisible** — Bumped the global scrollbar from 6px / `--border` color to 8px / 40 % white (60 % on hover, 4 px radius). Affects the project tree, tracker panel, PDF viewer, and every popup menu.
 - **Right-click "Move to" menu got cut off with many projects** — Both the project and paper context menus now apply `max-height: calc(100vh - 40px)` with `overflow-y: auto`, and a new `ClampedMenu` wrapper measures the menu after render and shifts it upward (and inward) so it never overflows the window edges. Mouse-wheel scrolling is contained to the menu (`overscroll-behavior: contain`).
 
-## [0.1.5] - 2026-04-09
+## [0.6] - 2026-04-09 *(git tag v0.1.5)*
 
 ### Fixed
 - **Keyword graph shakes while typing notes** — Editing any note field (Summary, Differentiation, Questions) triggered `updatePaper` → `fetchPapers`, which produced a new `papers` array reference. This caused `projectPaperIds` to rebuild a new `Set`, invalidating the `scopedKeywords` → `nodes` memo chain and restarting the D3 simulation on every keystroke. Fixed by deriving a stable string key from paper IDs only; the Set (and everything downstream) now only rebuilds when papers are actually added, removed, or moved — not when their content changes.
 
-## [0.1.4] - 2026-04-09
+## [0.5] - 2026-04-09 *(git tag v0.1.4)*
 
 ### Added
 - **Auto context menu on text selection** — Dragging to select text in the PDF now shows the highlight/memo/send menu automatically (80 ms after mouse release). Right-click still works as before.
@@ -142,12 +159,12 @@ All notable changes to HYJI will be documented in this file.
 - **First-page keyword scan rejects concatenated text** — Added `looksGarbled()` validation to the first-page "Keywords:" regex match: if extracted tokens contain obvious word concatenations (token > 18 chars, or token ends with a known multi-syllable suffix with a prefix), the batch is discarded and falls through to the title fallback.
 - **Stopword list expanded** — Added `improves`, `improved`, `improving`, `minimal`, `minimum`, `maximum`, `better`, `best`, `good`, `simple`, `without` to reduce noise in title-based keyword extraction.
 
-## [0.1.3] - 2026-04-08
+## [0.4] - 2026-04-08 *(git tag v0.1.3)*
 
 ### Fixed
 - **XMP keyword extraction** — Keywords stored exclusively in XMP metadata (e.g. Oxford Academic / JCDE journals) were not extracted because pdfjs transfers (detaches) the raw `ArrayBuffer` to its worker thread on load, leaving the bytes empty for subsequent reads. Fixed by searching the raw PDF bytes for `<pdf:Keywords>` **before** passing them to pdfjs, and giving pdfjs a copy (`bytes.slice()`) so the original buffer remains intact.
 
-## [0.1.2] - 2026-04-07
+## [0.3] - 2026-04-07 *(git tag v0.1.2)*
 
 ### Fixed
 - **Keyword duplication on paper import** — Two React effects (`regenForPaper` in PdfViewer and `autoExtractForPapers` in KeywordGraph) fired concurrently on every paper open, causing a race condition that inserted the same keywords twice. Fixed by removing the redundant auto-regen from PdfViewer, switching all keyword inserts to `INSERT OR IGNORE`, and adding a `UNIQUE(paper_id, keyword)` index with a dedup migration to clean up existing duplicates.
@@ -159,7 +176,7 @@ All notable changes to HYJI will be documented in this file.
 ### Removed
 - Plain `+` button (New Blank Paper) from the Papers section header — superseded by the Import PDF button in the Projects header.
 
-## [0.1.1] - 2026-04-06
+## [0.2] - 2026-04-06 *(git tag v0.1.1)*
 
 ### Improved
 - Questions section color changed to more vivid violet (#7c3aed) for better readability against dark background
@@ -173,7 +190,7 @@ All notable changes to HYJI will be documented in this file.
 ### Removed
 - Text size keyboard shortcuts (Ctrl+Shift+. / Ctrl+Shift+,) removed to avoid conflicts
 
-## [0.1.0] - 2026-04-06
+## [0.1] - 2026-04-06 *(git tag v0.1.0)*
 
 ### Added
 - Three-panel resizable layout (sidebar, PDF viewer, tracker)

@@ -3,7 +3,15 @@ import * as pdfjsLib from "pdfjs-dist";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
 import { normalizeVenue } from "./venueMap";
+import { useNetworkStore } from "../stores/network";
 import type { Paper, RefType } from "../types";
+
+/** Hard stop below the UI layer so no code path can fetch while offline mode is on. */
+function assertOnlineAllowed(): void {
+  if (useNetworkStore.getState().offlineMode) {
+    throw new Error("Offline mode is on — online lookups are disabled (Tools → Preferences… → Network & privacy).");
+  }
+}
 
 /**
  * Online metadata lookup (v1.0.5). Zotero-style "retrieve metadata":
@@ -84,6 +92,7 @@ function stripJats(s: string): string {
 }
 
 export async function fetchFromCrossref(doi: string): Promise<FetchedMetadata> {
+  assertOnlineAllowed();
   const body = await invoke<string>("http_get_text", {
     url: `https://api.crossref.org/works/${encodeURIComponent(doi)}`,
   });
@@ -115,6 +124,7 @@ export async function fetchFromCrossref(doi: string): Promise<FetchedMetadata> {
 }
 
 export async function fetchFromArxiv(arxivId: string): Promise<FetchedMetadata> {
+  assertOnlineAllowed();
   const body = await invoke<string>("http_get_text", {
     url: `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxivId)}&max_results=1`,
   });

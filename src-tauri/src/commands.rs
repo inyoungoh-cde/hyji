@@ -145,7 +145,7 @@ pub async fn http_get_text(url: String) -> Result<String, String> {
     }
 
     let client = reqwest::Client::builder()
-        .user_agent("HYJI/1.x (https://github.com/inyoungoh-cde/hyji; mailto:deanoh90@kist.re.kr)")
+        .user_agent("HYJI/2.x (+https://github.com/inyoungoh-cde/hyji)")
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| format!("HTTP client: {e}"))?;
