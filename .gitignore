@@ -4,3 +4,4 @@ src-tauri/target/
 *.db
 *.db-journal
 .env
+public/pdfjs/

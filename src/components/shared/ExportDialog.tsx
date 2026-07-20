@@ -3,6 +3,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { Modal } from "./Modal";
 import { generateBibTeX, papersToCsv } from "../../lib/bibtex";
+import { paperToRis, papersToRis } from "../../lib/ris";
 import {
   papersToCitations,
   formatPaperAsCitation,
@@ -11,7 +12,7 @@ import {
 import type { VenueFormat } from "../../lib/venueMap";
 import type { Paper } from "../../types";
 
-type Format = "bib" | "word" | "csv" | "clipboard";
+type Format = "bib" | "ris" | "word" | "csv" | "clipboard";
 
 interface ExportDialogProps {
   papers: Paper[];
@@ -34,11 +35,15 @@ export function ExportDialog({ papers, onClose }: ExportDialogProps) {
   const [venueFormat, setVenueFormat] = useState<VenueFormat>("full");
   const [busy, setBusy] = useState(false);
 
-  const stylingDisabled = format === "bib" || format === "csv";
+  // Citation styling only affects formatted citations (Word/clipboard);
+  // journal-name format also applies to BibTeX and RIS.
+  const stylingDisabled = format === "bib" || format === "csv" || format === "ris";
+  const venueDisabled = format === "csv";
 
   const preview = useMemo(() => {
     if (papers.length === 0) return "";
     if (format === "bib") return generateBibTeX(papers[0], { venueFormat });
+    if (format === "ris") return paperToRis(papers[0], { venueFormat });
     if (format === "csv") {
       const head = papersToCsv([papers[0]]).split("\n");
       return head.slice(0, 2).join("\n");
@@ -54,6 +59,9 @@ export function ExportDialog({ papers, onClose }: ExportDialogProps) {
   const buildContent = (): string => {
     if (format === "bib") {
       return papers.map((p) => generateBibTeX(p, { venueFormat })).join("\n\n");
+    }
+    if (format === "ris") {
+      return papersToRis(papers, { venueFormat });
     }
     if (format === "csv") {
       return papersToCsv(papers);
@@ -73,15 +81,18 @@ export function ExportDialog({ papers, onClose }: ExportDialogProps) {
         return;
       }
 
-      const ext = format === "bib" ? "bib" : format === "csv" ? "csv" : "txt";
+      const ext =
+        format === "bib" ? "bib" : format === "ris" ? "ris" : format === "csv" ? "csv" : "txt";
       const filterName =
-        format === "bib" ? "BibTeX" : format === "csv" ? "CSV" : "Text";
+        format === "bib" ? "BibTeX" : format === "ris" ? "RIS" : format === "csv" ? "CSV" : "Text";
       const defaultName =
         format === "bib"
           ? "references.bib"
-          : format === "csv"
-            ? "papers.csv"
-            : "references.txt";
+          : format === "ris"
+            ? "references.ris"
+            : format === "csv"
+              ? "papers.csv"
+              : "references.txt";
 
       const target = await save({
         defaultPath: defaultName,
@@ -102,7 +113,7 @@ export function ExportDialog({ papers, onClose }: ExportDialogProps) {
         {/* Output format */}
         <Section label="Output format">
           <div className="grid grid-cols-2 gap-1.5">
-            {(["bib", "word", "csv", "clipboard"] as Format[]).map((f) => (
+            {(["bib", "ris", "word", "csv", "clipboard"] as Format[]).map((f) => (
               <Radio
                 key={f}
                 checked={format === f}
@@ -110,11 +121,13 @@ export function ExportDialog({ papers, onClose }: ExportDialogProps) {
                 label={
                   f === "bib"
                     ? "LaTeX (.bib)"
-                    : f === "word"
-                      ? "Word references (.txt)"
-                      : f === "csv"
-                        ? "CSV (.csv)"
-                        : "Copy to clipboard"
+                    : f === "ris"
+                      ? "RIS (.ris)"
+                      : f === "word"
+                        ? "Word references (.txt)"
+                        : f === "csv"
+                          ? "CSV (.csv)"
+                          : "Copy to clipboard"
                 }
               />
             ))}
@@ -162,22 +175,22 @@ export function ExportDialog({ papers, onClose }: ExportDialogProps) {
         </Section>
 
         {/* Journal name format */}
-        <Section label="Journal names" disabled={stylingDisabled}>
+        <Section label="Journal names" disabled={venueDisabled}>
           <div className="flex flex-col gap-1.5">
             <Radio
-              disabled={stylingDisabled}
+              disabled={venueDisabled}
               checked={venueFormat === "full"}
               onChange={() => setVenueFormat("full")}
               label="Full name (Journal of the American …)"
             />
             <Radio
-              disabled={stylingDisabled}
+              disabled={venueDisabled}
               checked={venueFormat === "abbr"}
               onChange={() => setVenueFormat("abbr")}
               label="Abbreviation with dots (J. Am. Chem. Soc.)"
             />
             <Radio
-              disabled={stylingDisabled}
+              disabled={venueDisabled}
               checked={venueFormat === "abbr_nodots"}
               onChange={() => setVenueFormat("abbr_nodots")}
               label="Abbreviation no dots (J Am Chem Soc)"

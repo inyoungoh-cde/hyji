@@ -232,7 +232,7 @@ export function ProjectTree({
       { title: "Delete Paper", kind: "warning" }
     );
     if (!confirmed) return;
-    if (activePaperId === paperId) setActivePaper(null);
+    useUiStore.getState().closePaperTab(paperId);
     await deletePaper(paperId);
   };
 

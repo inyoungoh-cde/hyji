@@ -1,5 +1,6 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { readFile } from "@tauri-apps/plugin-fs";
+import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
 import { parseKeywordString } from "./keywordExtract";
 
 try {
@@ -53,7 +54,7 @@ export async function extractKeywordsFromPdf(pdfPath: string): Promise<string[]>
     } catch { /* ignore */ }
 
     // Pass a copy to pdfjs so the original bytes stay intact if needed later
-    const doc = await pdfjsLib.getDocument({ data: bytes.slice(), cMapPacked: false }).promise;
+    const doc = await pdfjsLib.getDocument({ data: bytes.slice(), ...PDFJS_ASSET_OPTIONS }).promise;
 
     // 1a. PDF info-dict Keywords field (most common format)
     const meta = await doc.getMetadata();

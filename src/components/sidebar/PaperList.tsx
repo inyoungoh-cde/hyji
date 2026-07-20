@@ -344,8 +344,7 @@ export function PaperList() {
       { title: "Delete Paper", kind: "warning" }
     );
     if (!confirmed) { setContextMenu(null); return; }
-    const activePaperId = useUiStore.getState().activePaperId;
-    if (activePaperId === contextMenu.paperId) setActivePaper(null);
+    useUiStore.getState().closePaperTab(contextMenu.paperId);
     await deletePaper(contextMenu.paperId);
     setContextMenu(null);
   };

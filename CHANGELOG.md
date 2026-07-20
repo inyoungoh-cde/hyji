@@ -2,6 +2,31 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.1] - 2026-07-20
+
+### Added
+
+- **Multi-tab PDF viewing** — Open papers side by side in a browser-style tab strip: one tab per paper, `＋` to import, per-tab `✕`, middle-click close, `Ctrl+W` to close the active tab. Each tab remembers its own zoom level and reading position, and open tabs are restored on the next launch. Double-click the active tab title to rename the paper.
+- **Single-instance app** — Opening a PDF from Explorer while HYJI is already running now opens it as a new tab in the existing window instead of launching a second window. Forwarded files are queued Rust-side, so nothing is lost even if the app is still starting up.
+- **CJK / CID font rendering** — pdf.js CMap tables, standard fonts, and wasm image decoders are now bundled with the app. Korean/Japanese/Chinese PDFs (Adobe-Korea1, Identity-H CID fonts, etc.) render their text correctly instead of showing an empty layout skeleton.
+- **Annotation interoperability** — "Save annotations to PDF" now writes real, standard `/Highlight` annotations (QuadPoints + Multiply-blend appearance streams; memo text stored as the annotation comment) instead of burning opaque rectangles. Highlights and memos made in HYJI are visible and editable in Adobe Acrobat and other viewers; highlights made in other viewers render in HYJI. Page rotation (`/Rotate 90/180/270`) and CropBox offsets are handled correctly.
+- **RIS export** — The Export dialog gains an RIS (`.ris`) format alongside BibTeX/Word/CSV, with journal-name formatting (full / abbreviated). Author lists are recovered from the preserved raw BibTeX so `Last, First` names export as correct individual `AU` lines.
+- **Print** — File → Print… and `Ctrl+P` print the open PDF (high-resolution render with highlights included), joining the existing toolbar button.
+- **Startup layout preference** — Preferences gains a "Startup layout" section: Remember last layout / Full workspace / Viewer only. Viewer-only starts HYJI with all panels closed for people who use it purely as a PDF reader; panel visibility now persists across sessions.
+- **Any-drive support** — PDFs on non-C: drives (D:, E:, USB sticks, network paths) now open and import correctly; the file-system permission scope previously covered only the user-profile folders.
+
+### Fixed
+
+- **Annotations not loading with hidden panels** — Highlights now load whenever a paper opens, even in Focus Mode or viewer-only layout (loading was previously tied to the tracker panel being visible).
+- **Data loading tied to the sidebar** — Papers, projects, and keywords now load at app level; starting with a hidden sidebar no longer shows an empty Dashboard and empty tab strip.
+- **Duplicate imports** — Importing or drag-dropping a PDF that is already in the library now activates the existing paper instead of creating a duplicate entry (which split notes/highlights across two records).
+- **Duplicate menu handlers** — Edit → Delete Paper no longer shows two confirmation dialogs; `Ctrl+/` no longer opens two stacked shortcut modals; the dead Edit → Select Mode item was removed.
+- **Menu items silently ignored while their panel was hidden** — Export All…, New Project, Find Paper, Keyword Graph (`Ctrl+G`), Expand Metadata (`Ctrl+M`) etc. now auto-show the panel they need instead of doing nothing.
+- **Focus Mode dead-ends** — Closing the last tab (or returning to the Dashboard) while in Focus Mode no longer strands the app with all panels hidden and `Esc`/`Ctrl+L` unresponsive.
+- **Deleting a project made its papers vanish** — Papers of a deleted project folder now immediately reappear under UNASSIGNED.
+- **Stale search state across tabs** — The in-PDF search query and match count reset when switching tabs.
+- **RIS field integrity** — Newlines inside abstracts no longer produce malformed RIS records.
+
 ## [1.0.0] - 2026-04-30
 
 ### Official Release

@@ -50,6 +50,7 @@ const SHORTCUT_CATEGORIES: { label: string; shortcuts: [string, string][] }[] = 
     label: "Print / Save",
     shortcuts: [
       ["Ctrl+P", "Print PDF"],
+      ["Ctrl+W", "Close tab"],
     ],
   },
 ];

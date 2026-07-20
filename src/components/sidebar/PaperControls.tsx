@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { usePapersStore } from "../../stores/papers";
-import { useUiStore } from "../../stores/ui";
 import { onMenuEvent } from "../../lib/menuEvents";
 import { ExportDialog } from "../shared/ExportDialog";
 import type { Paper } from "../../types";
@@ -49,8 +48,7 @@ export function PaperControls({
   selectedIds, onSelectAll, onSelectNone,
   searchQuery, onSearchQuery,
 }: PaperControlsProps) {
-  const { papers, deletePaper } = usePapersStore();
-  const setActivePaper = useUiStore((s) => s.setActivePaper);
+  const { papers } = usePapersStore();
   const [showSearch, setShowSearch] = useState(false);
   const [exportPapers, setExportPapers] = useState<Paper[] | null>(null);
   const papersRef = useRef(papers);
@@ -91,20 +89,8 @@ export function PaperControls({
       onMenuEvent("export-selected", handleExportSelected),
       onMenuEvent("export-all", handleExportAll),
       onMenuEvent("find-paper", () => setShowSearch((s) => !s)),
-      onMenuEvent("delete-paper", async () => {
-        const id = useUiStore.getState().activePaperId;
-        if (!id) return;
-        const { ask } = await import("@tauri-apps/plugin-dialog");
-        const paper = papersRef.current.find((p) => p.id === id);
-        const confirmed = await ask(
-          `Delete "${paper?.title ?? "this paper"}"?\nThis cannot be undone.`,
-          { title: "Delete Paper", kind: "warning" }
-        );
-        if (confirmed) {
-          setActivePaper(null);
-          deletePaper(id);
-        }
-      }),
+      // NOTE: "delete-paper" is handled in PdfViewer (which also closes the
+      // paper's tab) — registering it here too fired two confirm dialogs.
     ];
     return () => unsubs.forEach((fn) => fn());
   // eslint-disable-next-line react-hooks/exhaustive-deps

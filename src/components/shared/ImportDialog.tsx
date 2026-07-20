@@ -101,8 +101,24 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
     if (activePaperId) await attachPdf(activePaperId);
   };
 
+  const findByPdfPath = (path: string) => {
+    const norm = (p: string) => p.replace(/\//g, "\\").toLowerCase();
+    return usePapersStore
+      .getState()
+      .papers.find((p) => p.pdf_path && norm(p.pdf_path) === norm(path));
+  };
+
   const handleCreateNew = async () => {
     if (!filePath) return;
+
+    // Already in the library? Activate the existing paper instead of creating
+    // a duplicate row — notes/highlights would otherwise split across two records.
+    const existing = findByPdfPath(filePath);
+    if (existing) {
+      setActivePaper(existing.id);
+      handleClose();
+      return;
+    }
 
     // Resolve final path first (copy if needed) so the paper record is created
     // with pdf_path already set. This ensures autoExtractForPapers sees the path
@@ -121,6 +137,15 @@ export function ImportDialog({ open, onClose, droppedFilePath }: ImportDialogPro
       } catch (err) {
         console.error("Copy failed, falling back to link:", err);
       }
+    }
+
+    // The copy destination may also already be tracked (re-importing a file
+    // that was previously copied into the project folder).
+    const existingCopy = finalPath !== filePath ? findByPdfPath(finalPath) : undefined;
+    if (existingCopy) {
+      setActivePaper(existingCopy.id);
+      handleClose();
+      return;
     }
 
     const paper = await createPaper(title || "Untitled Paper", targetProjectId, finalPath, storageMode);

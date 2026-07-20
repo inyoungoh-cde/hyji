@@ -57,6 +57,11 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
     const db = await getDb();
     await db.execute("DELETE FROM projects WHERE id = ?", [id]);
     await get().fetchProjects();
+    // Papers of the deleted project got project_id = NULL in the DB
+    // (ON DELETE SET NULL) — refresh so they reappear under UNASSIGNED
+    // instead of vanishing until the next unrelated refetch.
+    const { usePapersStore } = await import("./papers");
+    await usePapersStore.getState().fetchPapers();
     markDbDirty();
   },
 

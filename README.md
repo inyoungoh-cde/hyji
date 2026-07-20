@@ -41,13 +41,15 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 ## Features
 
-- **PDF Viewer** — Continuous scroll, zoom, text search, clickable hyperlinks and internal reference links, Focus Mode (Ctrl+L) for distraction-free reading
+- **PDF Viewer** — Continuous scroll, zoom, text search, clickable hyperlinks and internal reference links, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK font support).
 
-- **Highlights & Memos** — 5 highlight colors, margin memos, save highlights to PDF as standard annotations
+- **Multi-tab reading** — Open several papers in browser-style tabs; each tab remembers its zoom and reading position, and your open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a new tab in the running app.
+
+- **Highlights & Memos** — 5 highlight colors, margin memos, and true two-way interop: "Save annotations to PDF" writes standard annotations that Adobe Acrobat and other viewers can display and edit, and highlights made elsewhere show up in HYJI.
 
 - **Smart Paste** — Paste BibTeX, citation string, arXiv ID, or RIS — HYJI auto-detects the format and parses all fields. Supports @article, @book, @phdthesis, and more.
 
-- **Export dialog** — Choose output format (LaTeX / Word / CSV / clipboard), citation style (IEEE / ACS / Nature / APA / MLA), journal name format (full / abbreviated), and starting number. Live preview included.
+- **Export dialog** — Choose output format (LaTeX / RIS / Word / CSV / clipboard), citation style (IEEE / ACS / Nature / APA / MLA), journal name format (full / abbreviated), and starting number. Live preview included.
 
 - **Project Tree** — Organize papers into collapsible folders, drag to reorder, inline rename with F2
 
@@ -158,6 +160,14 @@ Please keep PRs focused — one feature or fix per PR.
 ---
 
 ## Changelog
+
+### v1.0.1 (Jul 2026)
+- Multi-tab PDF viewing with per-tab zoom/position memory and session restore; Ctrl+W closes a tab
+- Single-instance app — PDFs opened from Explorer land as tabs in the running window
+- CJK/CID font rendering fixed (Korean/Japanese/Chinese PDFs no longer show empty text)
+- Real PDF annotation export — highlights/memos become standard annotations visible in Adobe & other viewers (rotation/CropBox aware); external annotations render in HYJI
+- RIS export with correct author splitting; File → Print… (Ctrl+P); startup layout preference (viewer-only mode)
+- PDFs on any drive (D:, USB, network) now open; many interaction fixes (panel-hidden menu items, duplicate imports, duplicate dialogs, Focus-mode dead-ends)
 
 ### v1.0.0 (Apr 2026)
 - Official release — all features from v0.1.x are now production-ready

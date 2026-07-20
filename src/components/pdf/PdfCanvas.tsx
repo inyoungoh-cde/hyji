@@ -3,6 +3,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { HighlightLayer } from "./HighlightLayer";
+import { PDFJS_ASSET_OPTIONS } from "../../lib/pdfjsAssets";
 import type { Annotation } from "../../types";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -59,6 +60,10 @@ export interface PdfCanvasHandle {
   scrollToY: (y: number) => void;
 }
 
+// Per-file scroll memory so switching viewer tabs returns to the position
+// the user was reading. Session-scoped by design (not persisted).
+const scrollMemory = new Map<string, number>();
+
 export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function PdfCanvas({
   filePath,
   scale,
@@ -77,6 +82,10 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   onInternalNavigate,
 }: PdfCanvasProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Which file the currently laid-out pages belong to. Scroll events are only
+  // recorded for that file — during a tab switch the collapsing old layout
+  // fires a clamped scroll-to-0 that must not overwrite the new file's memory.
+  const loadedFileRef = useRef<string | null>(null);
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [pages, setPages] = useState<PageEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +97,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   // Load document
   useEffect(() => {
     let cancelled = false;
+    loadedFileRef.current = null;
     renderedPages.current.clear();
     setPages([]);
     setDoc(null);
@@ -101,8 +111,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
 
         const pdfDoc = await pdfjsLib.getDocument({
           data: bytes,
-          cMapUrl: undefined,
-          cMapPacked: false,
+          ...PDFJS_ASSET_OPTIONS,
         }).promise;
         if (cancelled) return;
 
@@ -410,6 +419,17 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     pages.forEach((p) => renderPage(p.pageNum));
   }, [scale, pages, renderPage]);
 
+  // Restore the last reading position when this document (re)loads,
+  // e.g. after switching back to its tab. Only after this runs do scroll
+  // events start recording into this file's memory (loadedFileRef).
+  useEffect(() => {
+    if (pages.length === 0 || !containerRef.current) return;
+    const saved = scrollMemory.get(filePath);
+    if (saved != null) containerRef.current.scrollTop = saved;
+    loadedFileRef.current = filePath;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages]);
+
   // Intersection observer for lazy rendering + page tracking
   useEffect(() => {
     const root = containerRef.current;
@@ -612,6 +632,11 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto bg-[#525659] hyji-pdf-scroll"
+      onScroll={(e) => {
+        if (loadedFileRef.current === filePath) {
+          scrollMemory.set(filePath, e.currentTarget.scrollTop);
+        }
+      }}
       onMouseUp={(e) => {
         // Show context menu automatically after drag-select.
         // A tiny delay lets the browser finalize the selection before we read it.

@@ -9,7 +9,6 @@ import { Toolbar } from "../pdf/Toolbar";
 import { ContextMenu } from "../pdf/ContextMenu";
 import { SmartPaste } from "../shared/SmartPaste";
 import { ImportDialog } from "../shared/ImportDialog";
-import { ShortcutsModal } from "../shared/ShortcutsModal";
 import { onMenuEvent, emitMenuEvent } from "../../lib/menuEvents";
 import { useKeywordsStore } from "../../stores/keywords";
 import { extractPdfMeta } from "../../lib/pdfMeta";
@@ -24,6 +23,8 @@ const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 
 export function PdfViewer() {
   const activePaperId = useUiStore((s) => s.activePaperId);
+  const openPaperIds = useUiStore((s) => s.openPaperIds);
+  const closePaperTab = useUiStore((s) => s.closePaperTab);
   const focusMode = useUiStore((s) => s.focusMode);
   const scrollToAnnotation = useUiStore((s) => s.scrollToAnnotation);
   const setScrollToAnnotation = useUiStore((s) => s.setScrollToAnnotation);
@@ -31,7 +32,12 @@ export function PdfViewer() {
   const updatePaper = usePapersStore((s) => s.updatePaper);
   // updatePaper is also used for tab title rename (F2 / double-click)
   const activePaper = papers.find((p) => p.id === activePaperId);
-  const { annotations, createAnnotation, createNoteLink, updateAnnotation, deleteAnnotation } = useAnnotationsStore();
+  const { annotations, fetchAnnotations, createAnnotation, createNoteLink, updateAnnotation, deleteAnnotation } = useAnnotationsStore();
+  // Only pass the active paper's annotations to the canvas — the store may
+  // briefly hold the previous tab's annotations right after a switch.
+  const paperAnnotations = activePaperId
+    ? annotations.filter((a) => a.paper_id === activePaperId)
+    : [];
 
   const [scale, setScale] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,7 +57,6 @@ export function PdfViewer() {
   const [droppedFile, setDroppedFile] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<PdfContextMenuState | null>(null);
   const [editingMemo, setEditingMemo] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [showShortcuts, setShowShortcuts] = useState(false);
   const [editingTabTitle, setEditingTabTitle] = useState(false);
   const [tabTitleInput, setTabTitleInput] = useState("");
   const tabTitleInputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +67,22 @@ export function PdfViewer() {
     setTotalPages(doc.numPages);
     setCurrentPage(1);
   }, []);
+
+  // Annotations must load whenever the active paper changes, regardless of
+  // TrackerPanel visibility — focus mode and viewer-only layout unmount it,
+  // and highlights would otherwise never render (or show the previous paper's).
+  useEffect(() => {
+    if (activePaperId) fetchAnnotations(activePaperId);
+  }, [activePaperId, fetchAnnotations]);
+
+  // Drop persisted tabs whose papers no longer exist (deleted in a previous
+  // session, or the DB was restored from an older backup).
+  useEffect(() => {
+    if (papers.length === 0) return;
+    for (const id of openPaperIds) {
+      if (!papers.some((p) => p.id === id)) closePaperTab(id);
+    }
+  }, [papers, openPaperIds, closePaperTab]);
 
   const handlePageWidth = useCallback((w: number) => {
     pageWidthRef.current = w;
@@ -182,6 +203,30 @@ export function PdfViewer() {
   // Focus Mode toggle (reads latest scale via ref to avoid stale closure)
   const scaleRef = useRef(scale);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
+
+  // Per-tab zoom memory: save the outgoing tab's scale, restore the incoming
+  // one's (scroll position is remembered per file inside PdfCanvas).
+  const tabScaleMemory = useRef(new Map<string, number>());
+  const prevTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    if (prev && prev !== activePaperId) {
+      tabScaleMemory.current.set(prev, scaleRef.current);
+    }
+    prevTabRef.current = activePaperId;
+    if (activePaperId) {
+      const saved = tabScaleMemory.current.get(activePaperId);
+      if (saved !== undefined) setScale(saved);
+    }
+    // A rename in progress belongs to the previous tab — abandon it.
+    setEditingTabTitle(false);
+    // Search state belongs to the previous document — a stale match count
+    // over a fresh text layer would mislead.
+    setSearchQuery("");
+    setSearchIndex(0);
+    setSearchTotal(0);
+    setShowSearch(false);
+  }, [activePaperId]);
   const toggleFocusMode = useCallback(() => {
     const ui = useUiStore.getState();
     if (!ui.activePaperId) return; // dashboard
@@ -203,9 +248,36 @@ export function PdfViewer() {
     }
   }, []);
 
+  // Print: render pages at high resolution (highlights burned in) and hand
+  // them to the system print dialog via a hidden iframe.
+  const handlePrint = useCallback(async () => {
+    const imgs = await pdfCanvasRef.current?.getPrintImages();
+    if (!imgs || imgs.length === 0) return;
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;width:0;height:0;border:none;left:-9999px;";
+    document.body.appendChild(iframe);
+    const iDoc = iframe.contentDocument!;
+    iDoc.open();
+    iDoc.write(`<!DOCTYPE html><html><head><style>@page{margin:0;size:auto}body{margin:0}img{width:100%;display:block;page-break-after:always}</style></head><body>${imgs.map((s) => `<img src="${s}">`).join("")}</body></html>`);
+    iDoc.close();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => iframe.remove(), 3000);
+    }, 300);
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "p") {
+        e.preventDefault();
+        handlePrint();
+      }
+      if (e.ctrlKey && e.key === "w") {
+        e.preventDefault();
+        const { activePaperId: id, closePaperTab: close } = useUiStore.getState();
+        if (id) close(id);
+      }
       if (e.ctrlKey && e.key === "l") {
         e.preventDefault();
         toggleFocusMode();
@@ -250,10 +322,6 @@ export function PdfViewer() {
         e.preventDefault();
         setScale((s) => [...ZOOM_STEPS].reverse().find((z) => z < s) ?? s);
       }
-      if (e.ctrlKey && e.key === "/") {
-        e.preventDefault();
-        setShowShortcuts((s) => !s);
-      }
       if (e.ctrlKey && e.key === "0") {
         e.preventDefault();
         if (viewerRef.current && pageWidthRef.current) {
@@ -288,10 +356,11 @@ export function PdfViewer() {
   // Menu bar events
   useEffect(() => {
     const unsubs = [
-      onMenuEvent("shortcuts", () => setShowShortcuts(true)),
+      // "shortcuts" (Ctrl+/) is handled app-wide in App.tsx
       onMenuEvent("smart-paste", () => setSmartPasteOpen(true)),
       onMenuEvent("import-pdf", () => setImportOpen(true)),
       onMenuEvent("find-pdf", () => setShowSearch((s) => !s)),
+      onMenuEvent("print-pdf", handlePrint),
       onMenuEvent("focus-mode", toggleFocusMode),
       onMenuEvent("regen-keywords", async () => {
         const id = useUiStore.getState().activePaperId;
@@ -321,7 +390,7 @@ export function PdfViewer() {
           { title: "Delete Paper", kind: "warning" }
         );
         if (confirmed) {
-          useUiStore.getState().setActivePaper(null);
+          useUiStore.getState().closePaperTab(id);
           deletePaper(id);
         }
       }),
@@ -382,6 +451,8 @@ export function PdfViewer() {
           await db.execute("DELETE FROM annotations");
           await db.execute("DELETE FROM papers");
           await db.execute("DELETE FROM projects");
+          // Open tabs reference deleted papers — clear them before reload
+          try { localStorage.removeItem("hyji:open-tabs"); } catch { /* ignore */ }
           await message("All data cleared. HYJI will now restart.", { title: "Reset complete", kind: "info" });
           window.location.reload();
         } catch (e) {
@@ -458,86 +529,99 @@ export function PdfViewer() {
     return () => { unlisten?.(); };
   }, []);
 
-  if (!activePaper) {
-    return (
-      <>
+  const hasPdf = !!activePaper?.pdf_path;
+  const setActivePaper = useUiStore.getState().setActivePaper;
+  // Tabs in order; papers may still be loading at startup, so unresolved ids
+  // are simply not rendered yet (they appear once fetchPapers completes).
+  const openPapers = openPaperIds
+    .map((id) => papers.find((p) => p.id === id))
+    .filter((p): p is NonNullable<typeof p> => !!p);
+
+  return (
+    <div ref={viewerRef} className="h-full flex flex-col bg-bg-primary">
+      {/* Tab strip — browser-like: one tab per open paper, + to import */}
+      {openPapers.length > 0 && !focusMode && (
+        <div className="flex items-end border-b border-border bg-bg-secondary shrink-0 pl-1 pr-1 pt-1 gap-0.5 overflow-x-auto hyji-tab-scroll">
+          {openPapers.map((p) => {
+            const isActive = p.id === activePaperId;
+            return (
+              <div
+                key={p.id}
+                onClick={() => { if (!isActive) setActivePaper(p.id); }}
+                onAuxClick={(e) => {
+                  // Middle-click closes the tab, like a browser
+                  if (e.button === 1) { e.preventDefault(); closePaperTab(p.id); }
+                }}
+                className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-t-[6px] min-w-[90px] max-w-[200px] cursor-pointer select-none transition-colors ${
+                  isActive
+                    ? "bg-bg-primary text-text-primary border-x border-t border-border -mb-px"
+                    : "text-text-tertiary hover:bg-bg-tertiary/60 hover:text-text-secondary"
+                }`}
+                title={p.title}
+              >
+                <span className="text-small flex-shrink-0">📄</span>
+                {isActive && editingTabTitle ? (
+                  <input
+                    ref={tabTitleInputRef}
+                    value={tabTitleInput}
+                    onChange={(e) => setTabTitleInput(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onBlur={async () => {
+                      if (tabTitleInput.trim()) {
+                        await updatePaper(p.id, { title: tabTitleInput.trim() });
+                      }
+                      setEditingTabTitle(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                      if (e.key === "Escape") setEditingTabTitle(false);
+                    }}
+                    className="flex-1 min-w-0 bg-transparent text-body text-text-primary outline-none border-b border-accent selectable"
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className="truncate text-body flex-1 min-w-0"
+                    onDoubleClick={() => {
+                      if (!isActive) return;
+                      setTabTitleInput(p.title);
+                      setEditingTabTitle(true);
+                      setTimeout(() => tabTitleInputRef.current?.select(), 0);
+                    }}
+                  >
+                    {p.title}
+                  </span>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); closePaperTab(p.id); }}
+                  className={`text-small flex-shrink-0 rounded px-0.5 transition-opacity hover:text-text-primary hover:bg-bg-tertiary ${
+                    isActive ? "opacity-70" : "opacity-0 group-hover:opacity-70"
+                  }`}
+                  title="Close tab (Ctrl+W)"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+          <button
+            onClick={() => setImportOpen(true)}
+            className="text-body text-text-tertiary hover:text-accent transition-colors px-2 py-1 mb-0.5 rounded hover:bg-bg-tertiary flex-shrink-0"
+            title="Import PDF (Ctrl+O)"
+          >
+            ＋
+          </button>
+        </div>
+      )}
+
+      {!activePaper && (
         <Dashboard
           onImportPdf={() => setImportOpen(true)}
           onSmartPaste={() => setSmartPasteOpen(true)}
         />
-        <SmartPaste open={smartPasteOpen} onClose={() => { setSmartPasteOpen(false); setSmartPasteSeed(""); }} initialText={smartPasteSeed} />
-        <ImportDialog
-          open={importOpen}
-          onClose={() => { setImportOpen(false); setDroppedFile(null); }}
-          droppedFilePath={droppedFile}
-        />
-        <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
-      </>
-    );
-  }
+      )}
 
-  const hasPdf = !!activePaper.pdf_path;
-  const setActivePaper = useUiStore.getState().setActivePaper;
-
-  return (
-    <div ref={viewerRef} className="h-full flex flex-col bg-bg-primary">
-      {/* Tab bar */}
-      <div className="flex items-center border-b border-border bg-bg-secondary shrink-0 px-1 py-0.5 gap-1">
-        <div className="flex-1 flex items-center min-w-0 bg-bg-tertiary rounded px-2 py-1 gap-2">
-          <span className="text-small text-text-tertiary flex-shrink-0">📄</span>
-          {editingTabTitle ? (
-            <input
-              ref={tabTitleInputRef}
-              value={tabTitleInput}
-              onChange={(e) => setTabTitleInput(e.target.value)}
-              onBlur={async () => {
-                if (tabTitleInput.trim() && activePaper) {
-                  await updatePaper(activePaper.id, { title: tabTitleInput.trim() });
-                }
-                setEditingTabTitle(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.currentTarget.blur();
-                }
-                if (e.key === "Escape") {
-                  setEditingTabTitle(false);
-                }
-              }}
-              className="flex-1 min-w-0 bg-transparent text-body text-text-primary outline-none border-b border-accent selectable"
-              autoFocus
-            />
-          ) : (
-            <span
-              className="truncate text-body text-text-primary flex-1 min-w-0 cursor-text"
-              onDoubleClick={() => {
-                setTabTitleInput(activePaper.title);
-                setEditingTabTitle(true);
-                setTimeout(() => tabTitleInputRef.current?.select(), 0);
-              }}
-              title="Double-click or F2 to rename"
-            >
-              {activePaper.title}
-            </span>
-          )}
-          <button
-            onClick={() => setActivePaper(null)}
-            className="text-small text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0"
-            title="Close (return to Dashboard)"
-          >
-            ✕
-          </button>
-        </div>
-        <button
-          onClick={() => setImportOpen(true)}
-          className="text-body text-text-tertiary hover:text-accent transition-colors px-1.5 py-0.5 rounded hover:bg-bg-tertiary"
-          title="Import PDF"
-        >
-          ＋
-        </button>
-      </div>
-
-      {hasPdf && (
+      {activePaper && hasPdf && (
         <Toolbar
           currentPage={currentPage}
           totalPages={totalPages}
@@ -557,65 +641,20 @@ export function PdfViewer() {
           importance={activePaper.importance}
           focusMode={focusMode}
           onToggleFocus={toggleFocusMode}
-          onPrint={async () => {
-            const imgs = await pdfCanvasRef.current?.getPrintImages();
-            if (!imgs || imgs.length === 0) return;
-            const iframe = document.createElement("iframe");
-            iframe.style.cssText = "position:fixed;width:0;height:0;border:none;left:-9999px;";
-            document.body.appendChild(iframe);
-            const iDoc = iframe.contentDocument!;
-            iDoc.open();
-            iDoc.write(`<!DOCTYPE html><html><head><style>@page{margin:0;size:auto}body{margin:0}img{width:100%;display:block;page-break-after:always}</style></head><body>${imgs.map((s) => `<img src="${s}">`).join("")}</body></html>`);
-            iDoc.close();
-            setTimeout(() => {
-              iframe.contentWindow?.print();
-              setTimeout(() => iframe.remove(), 3000);
-            }, 300);
-          }}
+          onPrint={handlePrint}
           onSave={async () => {
-            if (!activePaper?.pdf_path || annotations.length === 0) return;
+            if (!activePaper?.pdf_path || paperAnnotations.length === 0) return;
             try {
-              const { PDFDocument, rgb } = await import("pdf-lib");
               const { readFile, writeFile } = await import("@tauri-apps/plugin-fs");
               const { save } = await import("@tauri-apps/plugin-dialog");
+              const { exportAnnotationsToPdf } = await import("../../lib/pdfAnnotExport");
 
+              // Standard /Highlight annotations — visible and editable in
+              // Adobe Acrobat and other PDF viewers (memo text → /Contents).
               const bytes = await readFile(activePaper.pdf_path);
-              const pdfDoc = await PDFDocument.load(bytes);
-              const pages = pdfDoc.getPages();
-
-              const hexToRgb = (hex: string) => {
-                const r = parseInt(hex.slice(1, 3), 16) / 255;
-                const g = parseInt(hex.slice(3, 5), 16) / 255;
-                const b = parseInt(hex.slice(5, 7), 16) / 255;
-                return rgb(r, g, b);
-              };
-
-              for (const ann of annotations) {
-                if (ann.type !== "highlight") continue;
-                let rects: { x: number; y: number; w: number; h: number; pageIndex?: number }[] = [];
-                try { rects = JSON.parse(ann.rects_json || "[]"); } catch { continue; }
-                if (rects.length === 0) continue;
-
-                for (const rect of rects) {
-                  const pageNum = (rect.pageIndex ?? ann.page) - 1;
-                  const page = pages[pageNum];
-                  if (!page) continue;
-                  const { height } = page.getSize();
-                  // pdf.js uses top-left origin; pdf-lib uses bottom-left
-                  page.drawRectangle({
-                    x: rect.x,
-                    y: height - rect.y - rect.h,
-                    width: rect.w,
-                    height: rect.h,
-                    color: hexToRgb(ann.color.slice(0, 7)),
-                    opacity: 0.35,
-                  });
-                }
-              }
-
-              const outBytes = await pdfDoc.save();
+              const outBytes = await exportAnnotationsToPdf(bytes, paperAnnotations);
               const savePath = await save({
-                defaultPath: activePaper.pdf_path.replace(/\.pdf$/i, "_highlighted.pdf"),
+                defaultPath: activePaper.pdf_path.replace(/\.pdf$/i, "_annotated.pdf"),
                 filters: [{ name: "PDF", extensions: ["pdf"] }],
               });
               if (savePath) {
@@ -629,7 +668,7 @@ export function PdfViewer() {
         />
       )}
 
-      {hasPdf ? (
+      {activePaper && hasPdf && (
         <PdfCanvas
           ref={pdfCanvasRef}
           filePath={activePaper.pdf_path}
@@ -643,12 +682,13 @@ export function PdfViewer() {
           scrollToAnnotation={scrollToAnnotation}
           onContextMenu={handleContextMenu}
           onPageWidth={handlePageWidth}
-          annotations={annotations}
+          annotations={paperAnnotations}
           onMemoOpen={(id, sx, sy) => setEditingMemo({ id, x: sx, y: sy })}
           onAnnotationDelete={(id) => { if (activePaperId) deleteAnnotation(id, activePaperId); }}
           onInternalNavigate={(fromY) => setBackScrollTop(fromY)}
         />
-      ) : (
+      )}
+      {activePaper && !hasPdf && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="text-[3.692rem] mb-4 opacity-20">📄</div>
@@ -694,7 +734,6 @@ export function PdfViewer() {
           }}
         />
       )}
-      <ShortcutsModal open={showShortcuts} onClose={() => setShowShortcuts(false)} />
 
       {/* Floating "Back to reading position" button — appears after clicking an internal link */}
       {backScrollTop !== null && (
@@ -730,7 +769,7 @@ export function PdfViewer() {
       )}
 
       {editingMemo && (() => {
-        const memoAnn = annotations.find((a) => a.id === editingMemo.id);
+        const memoAnn = paperAnnotations.find((a) => a.id === editingMemo.id);
         if (!memoAnn) return null;
         return (
           <MemoEditor

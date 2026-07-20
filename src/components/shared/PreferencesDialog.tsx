@@ -8,6 +8,17 @@ import {
   type BackupConfig,
   type BackupStatus,
 } from "../../lib/backup";
+import {
+  loadStartupLayout,
+  saveStartupLayout,
+  type StartupLayout,
+} from "../../stores/ui";
+
+const LAYOUT_OPTIONS: { value: StartupLayout; label: string; hint: string }[] = [
+  { value: "remember", label: "Remember last layout", hint: "Panels reopen exactly as you left them" },
+  { value: "full", label: "Full workspace", hint: "Sidebar + tracker always open on launch" },
+  { value: "viewer", label: "Viewer only", hint: "Start with all panels closed — pure PDF reading (Ctrl+B / Ctrl+J to reopen)" },
+];
 
 interface PreferencesDialogProps {
   open: boolean;
@@ -35,6 +46,12 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
     last_backup_size: null,
   });
   const [saving, setSaving] = useState(false);
+  const [startupLayout, setStartupLayout] = useState<StartupLayout>(loadStartupLayout);
+
+  const handleLayoutChange = (layout: StartupLayout) => {
+    setStartupLayout(layout);
+    saveStartupLayout(layout);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -100,6 +117,29 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
         <div className="text-body text-text-tertiary py-6 text-center">Loading…</div>
       ) : (
         <div className="flex flex-col gap-4">
+          <Section label="Startup layout">
+            <div className="flex flex-col gap-2">
+              {LAYOUT_OPTIONS.map((o) => (
+                <label
+                  key={o.value}
+                  className="flex items-start gap-2 text-body text-text-primary cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="startup-layout"
+                    checked={startupLayout === o.value}
+                    onChange={() => handleLayoutChange(o.value)}
+                    className="accent-[#58a6ff] mt-0.5"
+                  />
+                  <span>
+                    {o.label}
+                    <span className="block text-caption text-text-tertiary">{o.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Section>
+
           <Section label="Auto-backup">
             <label className="flex items-center gap-2 text-body text-text-primary cursor-pointer">
               <input

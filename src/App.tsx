@@ -11,8 +11,10 @@ import { KeyboardShortcutsModal } from "./components/shared/KeyboardShortcutsMod
 import { PreferencesDialog } from "./components/shared/PreferencesDialog";
 import { useUiStore } from "./stores/ui";
 import { usePapersStore } from "./stores/papers";
+import { useProjectsStore } from "./stores/projects";
+import { useKeywordsStore } from "./stores/keywords";
 import { emitMenuEvent, onMenuEvent } from "./lib/menuEvents";
-import { extractPdfMeta } from "./lib/pdfMeta";
+import { importOrOpenPdf } from "./lib/openPdf";
 
 const SIDEBAR_MIN = 160;
 const SIDEBAR_MAX = 320;
@@ -49,6 +51,30 @@ export default function App() {
     if (textSize === "xlarge") html.classList.add("font-xlarge");
   }, [textSize]);
 
+  // App-level data bootstrap. Panels can start hidden (viewer-only layout),
+  // so loading papers/projects must never depend on Sidebar being mounted.
+  useEffect(() => {
+    usePapersStore.getState().fetchPapers().catch(console.error);
+    useProjectsStore.getState().fetchProjects().catch(console.error);
+  }, []);
+
+  // Keywords follow the paper set: fetch + auto-extract for papers that have
+  // none yet. Owned here (not in KeywordGraph) so it runs even when the
+  // sidebar or the graph section is hidden.
+  const papers = usePapersStore((s) => s.papers);
+  const paperIdKey = papers.map((p) => p.id).join(",");
+  useEffect(() => {
+    const { fetchKeywords, autoExtractForPapers } = useKeywordsStore.getState();
+    if (papers.length === 0) {
+      fetchKeywords().catch(console.error);
+      return;
+    }
+    fetchKeywords()
+      .then(() => autoExtractForPapers(papers))
+      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paperIdKey]);
+
   // Menu events: toggle panels + modals + text size
   useEffect(() => {
     const unsubs = [
@@ -82,10 +108,38 @@ export default function App() {
   // if cleanup runs before the Promise resolves, unlisten is still null
   // and the first Tauri listener leaks — resulting in every event firing twice.
   useEffect(() => {
+    // Handlers for these menu items live inside a panel component; if that
+    // panel is hidden the handler is unmounted and the click would silently
+    // no-op. Show the required panel first, then re-emit after it mounts.
+    const PANEL_REQUIRED: Record<string, "sidebar" | "tracker"> = {
+      "new-project": "sidebar",
+      "selection-mode": "sidebar",
+      "export-selected": "sidebar",
+      "export-all": "sidebar",
+      "find-paper": "sidebar",
+      "keyword-graph": "sidebar",
+      "expand-metadata": "tracker",
+    };
+    const dispatchMenuEvent = (id: string) => {
+      const panel = PANEL_REQUIRED[id];
+      const ui = useUiStore.getState();
+      const hidden =
+        panel === "sidebar" ? !ui.sidebarVisible :
+        panel === "tracker" ? !ui.trackerVisible : false;
+      if (panel && hidden) {
+        if (panel === "sidebar") ui.toggleSidebar();
+        else ui.toggleTracker();
+        // Give React a beat to mount the panel and register its handler
+        setTimeout(() => emitMenuEvent(id), 120);
+        return;
+      }
+      emitMenuEvent(id);
+    };
+
     let cancelled = false;
     let unlisten: (() => void) | null = null;
     listen<string>("menu-event", (event) => {
-      emitMenuEvent(event.payload);
+      dispatchMenuEvent(event.payload);
     }).then((fn) => {
       if (cancelled) fn(); // already unmounted — unregister immediately
       else unlisten = fn;
@@ -96,25 +150,38 @@ export default function App() {
     };
   }, []);
 
-  // PDF file association: if HYJI was launched with a .pdf path
-  // (e.g. double-clicked in Explorer), import it as an unassigned
-  // paper and open it. Runs once per launch.
+  // PDF file association + single instance. PDFs to open arrive in a Rust-side
+  // queue: from argv at launch, and from second launches forwarded by the
+  // single-instance plugin. Drain it on mount, and again whenever the
+  // "open-pdf-external" nudge fires — the pull model means a PDF forwarded
+  // before this listener registered is still picked up by the mount drain.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const drainPendingPdfs = async () => {
       try {
-        const path = await invoke<string | null>("take_pending_open_file");
-        if (cancelled || !path) return;
-        const meta = await extractPdfMeta(path).catch(() => ({ title: "" }));
-        const filename = path.split(/[/\\]/).pop() ?? "Untitled";
-        const title = meta.title || filename.replace(/\.pdf$/i, "");
-        const paper = await usePapersStore.getState().createPaper(title, null, path, "link");
-        if (!cancelled) useUiStore.getState().setActivePaper(paper.id);
+        const paths = await invoke<string[]>("take_pending_open_files");
+        for (const path of paths) {
+          if (cancelled) return;
+          await importOrOpenPdf(path);
+        }
       } catch (e) {
-        console.error("Failed to open associated PDF:", e);
+        console.error("Failed to open pending PDF:", e);
       }
-    })();
-    return () => { cancelled = true; };
+    };
+
+    drainPendingPdfs();
+
+    let unlisten: (() => void) | null = null;
+    listen("open-pdf-external", () => { drainPendingPdfs(); })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      })
+      .catch(console.error);
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
   const onSidebarResize = useCallback(

@@ -9,11 +9,19 @@ use backup::{
     spawn_backup_loop, trigger_manual_backup, BackupState,
 };
 
-pub struct PendingOpenFile(pub Mutex<Option<String>>);
+// Queue of PDF paths waiting to be opened by the frontend. Filled from argv
+// at launch and by the single-instance handler when a second launch forwards
+// its argv. The frontend drains it via take_pending_open_files — a pull model,
+// so paths queued before the webview finishes loading are never lost.
+pub struct PendingOpenFile(pub Mutex<Vec<String>>);
 
 #[tauri::command]
-fn take_pending_open_file(state: State<'_, PendingOpenFile>) -> Option<String> {
-    state.0.lock().ok().and_then(|mut g| g.take())
+fn take_pending_open_files(state: State<'_, PendingOpenFile>) -> Vec<String> {
+    state
+        .0
+        .lock()
+        .map(|mut g| std::mem::take(&mut *g))
+        .unwrap_or_default()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,7 +31,32 @@ pub fn run() {
         .find(|a| a.to_lowercase().ends_with(".pdf"));
 
     tauri::Builder::default()
-        .manage(PendingOpenFile(Mutex::new(pending_pdf)))
+        // Must be registered first: a second HYJI launch (e.g. double-clicking
+        // a PDF in Explorer) forwards its argv to this instance and exits,
+        // so the PDF opens as a tab here instead of a new window.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let pdfs: Vec<String> = argv
+                .iter()
+                .skip(1)
+                .filter(|a| a.to_lowercase().ends_with(".pdf"))
+                .cloned()
+                .collect();
+            // Queue first (pull model survives a not-yet-loaded webview),
+            // then nudge the frontend to drain the queue.
+            if !pdfs.is_empty() {
+                if let Ok(mut queue) = app.state::<PendingOpenFile>().0.lock() {
+                    queue.extend(pdfs);
+                }
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+                let _ = window.emit("open-pdf-external", ());
+            }
+        }))
+        .manage(PendingOpenFile(Mutex::new(
+            pending_pdf.into_iter().collect(),
+        )))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -42,7 +75,7 @@ pub fn run() {
             commands::get_paper,
             commands::update_paper,
             commands::delete_paper,
-            take_pending_open_file,
+            take_pending_open_files,
             get_backup_config,
             set_backup_config,
             get_backup_status,
@@ -72,6 +105,8 @@ pub fn run() {
                 .text("import-pdf", "Import PDF...\tCtrl+O")
                 .text("smart-paste", "Smart Paste\tCtrl+N")
                 .separator()
+                .text("print-pdf", "Print...\tCtrl+P")
+                .separator()
                 .text("selection-mode", "Selection Mode\tCtrl+Shift+S")
                 .text("export-selected", "Export Selected...")
                 .text("export-all", "Export All...")
@@ -86,7 +121,6 @@ pub fn run() {
                 .text("find-pdf", "Find in PDF\tCtrl+F")
                 .text("find-paper", "Find Paper\tCtrl+Shift+F")
                 .separator()
-                .text("select-mode", "Select Mode")
                 .text("delete-paper", "Delete Paper")
                 .build()?;
 

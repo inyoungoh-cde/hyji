@@ -235,7 +235,7 @@ export function Toolbar({
         <button
           onClick={onSave}
           className="px-1.5 py-0.5 rounded text-body text-text-tertiary hover:text-accent hover:bg-bg-tertiary transition-colors"
-          title="Save highlights to PDF"
+          title="Save annotations to PDF (visible in Adobe & other viewers)"
         >
           💾
         </button>

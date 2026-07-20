@@ -27,25 +27,15 @@ function keywordColor(kw: string): string {
 
 export function KeywordGraph() {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { keywords, fetchKeywords, autoExtractForPapers } = useKeywordsStore();
+  const { keywords } = useKeywordsStore();
   const papers = usePapersStore((s) => s.papers);
   const selectedProjectId = useUiStore((s) => s.selectedProjectId);
   const keywordFilter = useUiStore((s) => s.keywordFilter);
   const setKeywordFilter = useUiStore((s) => s.setKeywordFilter);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
 
-  // Stable paper-id string: re-run extraction whenever paper set changes
-  const paperIdKey = papers.map((p) => p.id).join(",");
-
-  useEffect(() => {
-    if (papers.length === 0) {
-      // Refresh from DB so stale in-memory keywords are cleared
-      fetchKeywords();
-      return;
-    }
-    fetchKeywords().then(() => autoExtractForPapers(papers));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paperIdKey]);
+  // Keyword fetching + auto-extraction is owned by App.tsx so it runs even
+  // when the sidebar/graph is hidden — this component only reads the store.
 
   // Stable string key for papers in the current project scope.
   // Derived from paper IDs only — content changes (e.g. editing notes) do NOT

@@ -2,6 +2,80 @@ import { create } from "zustand";
 
 export type TextSize = "normal" | "large" | "xlarge";
 
+// Startup layout preference — what the panels look like when HYJI launches.
+// "remember": restore whatever the user had last session.
+// "full":     research hub — sidebar + tracker open.
+// "viewer":   distraction-free reading — both panels closed (viewer-only).
+export type StartupLayout = "remember" | "full" | "viewer";
+
+export function loadStartupLayout(): StartupLayout {
+  try {
+    const v = localStorage.getItem("hyji:startup-layout");
+    if (v === "full" || v === "viewer") return v;
+  } catch { /* ignore */ }
+  return "remember";
+}
+
+export function saveStartupLayout(layout: StartupLayout): void {
+  try { localStorage.setItem("hyji:startup-layout", layout); } catch { /* ignore */ }
+}
+
+function loadBool(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    if (v === "1" || v === "0") return v === "1";
+  } catch { /* ignore */ }
+  return fallback;
+}
+
+function initialPanelVisibility(): { sidebar: boolean; tracker: boolean } {
+  const layout = loadStartupLayout();
+  if (layout === "full") return { sidebar: true, tracker: true };
+  if (layout === "viewer") return { sidebar: false, tracker: false };
+  return {
+    sidebar: loadBool("hyji:sidebar-visible", true),
+    tracker: loadBool("hyji:tracker-visible", true),
+  };
+}
+
+function persistPanel(key: string, visible: boolean): void {
+  try { localStorage.setItem(key, visible ? "1" : "0"); } catch { /* ignore */ }
+}
+
+// Restores panel visibility from the pre-focus snapshot when focus mode must
+// end implicitly (e.g. the last tab closed while focused). Mirrors exitFocusMode.
+function focusExitPatch(s: {
+  focusMode: boolean;
+  preFocusState: PreFocusState | null;
+  sidebarVisible: boolean;
+  trackerVisible: boolean;
+}): Partial<{
+  focusMode: boolean;
+  preFocusState: PreFocusState | null;
+  sidebarVisible: boolean;
+  trackerVisible: boolean;
+}> {
+  if (!s.focusMode) return {};
+  const snap = s.preFocusState;
+  const sidebarVisible = snap ? snap.sidebarOpen : s.sidebarVisible;
+  const trackerVisible = snap ? snap.trackerOpen : s.trackerVisible;
+  persistPanel("hyji:sidebar-visible", sidebarVisible);
+  persistPanel("hyji:tracker-visible", trackerVisible);
+  return { focusMode: false, preFocusState: null, sidebarVisible, trackerVisible };
+}
+
+function loadOpenTabs(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem("hyji:open-tabs") ?? "[]");
+    if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string");
+  } catch { /* ignore */ }
+  return [];
+}
+
+function persistOpenTabs(ids: string[]): void {
+  try { localStorage.setItem("hyji:open-tabs", JSON.stringify(ids)); } catch { /* ignore */ }
+}
+
 export interface PreFocusState {
   sidebarOpen: boolean;
   trackerOpen: boolean;
@@ -14,6 +88,8 @@ interface UiState {
   sidebarVisible: boolean;
   trackerVisible: boolean;
   activePaperId: string | null;
+  /** Papers open as viewer tabs, in tab order. Persisted across sessions. */
+  openPaperIds: string[];
   selectedProjectId: string | null;
   keywordFilter: string | null;
   scrollToAnnotation: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null;
@@ -26,6 +102,7 @@ interface UiState {
   toggleSidebar: () => void;
   toggleTracker: () => void;
   setActivePaper: (id: string | null) => void;
+  closePaperTab: (id: string) => void;
   setSelectedProject: (id: string | null) => void;
   setKeywordFilter: (keyword: string | null) => void;
   setScrollToAnnotation: (req: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null) => void;
@@ -54,12 +131,15 @@ function loadTextSize(): TextSize {
   return "normal";
 }
 
+const initialPanels = initialPanelVisibility();
+
 export const useUiStore = create<UiState>((set, get) => ({
   sidebarWidth: loadNumber("hyji:sidebar-width", SIDEBAR_DEFAULT),
   trackerWidth: loadNumber("hyji:tracker-width", TRACKER_DEFAULT),
-  sidebarVisible: true,
-  trackerVisible: true,
+  sidebarVisible: initialPanels.sidebar,
+  trackerVisible: initialPanels.tracker,
   activePaperId: null,
+  openPaperIds: loadOpenTabs(),
   selectedProjectId: null,
   keywordFilter: null,
   scrollToAnnotation: null,
@@ -76,19 +156,59 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ trackerWidth: w });
   },
   toggleSidebar: () =>
-    set((s) => ({
-      sidebarVisible: !s.sidebarVisible,
-      // Manual sidebar toggle while focused -> drop focus mode
-      focusMode: s.focusMode ? false : s.focusMode,
-      preFocusState: s.focusMode ? null : s.preFocusState,
-    })),
+    set((s) => {
+      persistPanel("hyji:sidebar-visible", !s.sidebarVisible);
+      return {
+        sidebarVisible: !s.sidebarVisible,
+        // Manual sidebar toggle while focused -> drop focus mode
+        focusMode: s.focusMode ? false : s.focusMode,
+        preFocusState: s.focusMode ? null : s.preFocusState,
+      };
+    }),
   toggleTracker: () =>
-    set((s) => ({
-      trackerVisible: !s.trackerVisible,
-      focusMode: s.focusMode ? false : s.focusMode,
-      preFocusState: s.focusMode ? null : s.preFocusState,
-    })),
-  setActivePaper: (id) => set({ activePaperId: id }),
+    set((s) => {
+      persistPanel("hyji:tracker-visible", !s.trackerVisible);
+      return {
+        trackerVisible: !s.trackerVisible,
+        focusMode: s.focusMode ? false : s.focusMode,
+        preFocusState: s.focusMode ? null : s.preFocusState,
+      };
+    }),
+  // Activating a paper also opens it as a tab (browser-like behavior).
+  // Passing null returns to the Dashboard but keeps tabs open.
+  setActivePaper: (id) =>
+    set((s) => {
+      if (id === null) {
+        // Landing on the Dashboard while in Focus Mode would strand the user
+        // (Esc/Ctrl+L only work with an active paper) — exit focus first.
+        return { activePaperId: null, ...focusExitPatch(s) };
+      }
+      if (s.openPaperIds.includes(id)) return { activePaperId: id };
+      const openPaperIds = [...s.openPaperIds, id];
+      persistOpenTabs(openPaperIds);
+      return { activePaperId: id, openPaperIds };
+    }),
+  closePaperTab: (id) =>
+    set((s) => {
+      const idx = s.openPaperIds.indexOf(id);
+      if (idx === -1) {
+        // Not an open tab; still clear active selection if it pointed here
+        return s.activePaperId === id
+          ? { activePaperId: null, ...focusExitPatch(s) }
+          : {};
+      }
+      const openPaperIds = s.openPaperIds.filter((x) => x !== id);
+      persistOpenTabs(openPaperIds);
+      const activePaperId =
+        s.activePaperId === id
+          ? openPaperIds[Math.min(idx, openPaperIds.length - 1)] ?? null
+          : s.activePaperId;
+      return {
+        openPaperIds,
+        activePaperId,
+        ...(activePaperId === null ? focusExitPatch(s) : {}),
+      };
+    }),
   setSelectedProject: (id) => set({ selectedProjectId: id }),
   setKeywordFilter: (keyword) => set({ keywordFilter: keyword }),
   setScrollToAnnotation: (req) => set({ scrollToAnnotation: req }),
@@ -105,11 +225,15 @@ export const useUiStore = create<UiState>((set, get) => ({
     }),
   exitFocusMode: () => {
     const snap = get().preFocusState;
+    const sidebarVisible = snap ? snap.sidebarOpen : get().sidebarVisible;
+    const trackerVisible = snap ? snap.trackerOpen : get().trackerVisible;
+    persistPanel("hyji:sidebar-visible", sidebarVisible);
+    persistPanel("hyji:tracker-visible", trackerVisible);
     set({
       focusMode: false,
       preFocusState: null,
-      sidebarVisible: snap ? snap.sidebarOpen : get().sidebarVisible,
-      trackerVisible: snap ? snap.trackerOpen : get().trackerVisible,
+      sidebarVisible,
+      trackerVisible,
     });
     return snap;
   },

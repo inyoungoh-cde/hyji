@@ -75,6 +75,17 @@ body,
   background: rgba(255, 255, 255, 0.6);
 }
 
+/* Tab strip: near-invisible 3px scrollbar so overflowing tabs stay tidy */
+.hyji-tab-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+.hyji-tab-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+.hyji-tab-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
 /* Selection */
 ::selection {
   background: var(--accent);
