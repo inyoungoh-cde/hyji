@@ -130,3 +130,34 @@ pub async fn delete_paper(id: String) -> Result<(), String> {
     let _ = id;
     Ok(())
 }
+
+/// Fetch text from an allowlisted metadata API. Runs in Rust because the
+/// WebView enforces CORS (arXiv's API sends no CORS headers) and because a
+/// proper User-Agent (Crossref "polite pool") must be attached.
+#[tauri::command]
+pub async fn http_get_text(url: String) -> Result<String, String> {
+    const ALLOWED_PREFIXES: [&str; 2] = [
+        "https://api.crossref.org/",
+        "https://export.arxiv.org/",
+    ];
+    if !ALLOWED_PREFIXES.iter().any(|p| url.starts_with(p)) {
+        return Err(format!("URL not allowed: {url}"));
+    }
+
+    let client = reqwest::Client::builder()
+        .user_agent("HYJI/1.x (https://github.com/inyoungoh-cde/hyji; mailto:deanoh90@kist.re.kr)")
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| format!("HTTP client: {e}"))?;
+
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status().as_u16()));
+    }
+    resp.text().await.map_err(|e| format!("Read body: {e}"))
+}

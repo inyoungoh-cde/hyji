@@ -2,6 +2,13 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.5] - 2026-07-20
+
+### Added
+
+- **Fetch metadata online** — a "🌐 Fetch metadata (DOI / arXiv)" button in the tracker's metadata section looks the paper up on Crossref (falling back to the arXiv API). The DOI or arXiv ID is taken from the paper's DOI field or extracted automatically from the first pages of the PDF. A confirmation dialog shows exactly which fields would change (old value struck through) — untick anything you want to keep, then Apply. Fills title, authors, year, venue (normalized), type, publisher, pages, DOI, abstract, and link.
+- Requests go directly from your machine with a polite `User-Agent` (no account, no proxy, no tracking); the feature simply does nothing when offline. This is a deliberate, narrow exception to the "no web scraping" non-goal — lookup only, never bulk downloading.
+
 ## [1.0.4] - 2026-07-20
 
 ### Added

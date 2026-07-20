@@ -6,6 +6,7 @@ import { useKeywordsStore } from "../../stores/keywords";
 import { BulletEditor } from "../tracker/BulletEditor";
 import { generateBibTeX } from "../../lib/bibtex";
 import { onMenuEvent } from "../../lib/menuEvents";
+import { FetchMetadataButton } from "../tracker/FetchMetadataButton";
 import type { Paper, NoteLink, RefType } from "../../types";
 import { REF_TYPE_LABELS } from "../../types";
 
@@ -187,6 +188,8 @@ export function TrackerPanel() {
                 ))}
               </select>
             </div>
+            {/* Online lookup — Crossref / arXiv by DOI or arXiv ID */}
+            <FetchMetadataButton paper={activePaper} />
             {/* Title */}
             <input
               value={activePaper.title}

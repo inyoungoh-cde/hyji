@@ -96,6 +96,7 @@ hyji/
 │   │   ├── pdfAnnotExport.ts # Write standard /Highlight,/Underline,/StrikeOut annots (rotation/CropBox aware)
 │   │   ├── pdfAnnotImport.ts # Scan foreign annotations + strip-after-import (take ownership)
 │   │   ├── ftsSearch.ts   # FTS5 trigram full-text index + search (LIKE fallback for 1-2 chars)
+│   │   ├── metadataFetch.ts # Crossref→arXiv lookup (DOI/arXiv extraction; Rust http_get_text for CORS)
 │   │   ├── openPdf.ts     # importOrOpenPdf: dedup-by-path open (file assoc / single-instance)
 │   │   ├── venueMap.ts    # 247-entry venue lookup (full/abbr/abbr_nodots/code)
 │   │   ├── venues.json    # Venue data file (ISO 4 / CASSI)
@@ -744,4 +745,4 @@ What to ship per release:
 - No mobile version
 - ~~No citation style formatting~~ — **implemented in v0.1.7** (IEEE/ACS/Nature/APA/MLA via Export dialog)
 - No PDF editing (no form fill, no page manipulation)
-- No web scraping (no auto-download from arXiv/Semantic Scholar) — online *metadata lookup* (Crossref/arXiv) is the v1.0.5 roadmap candidate, see doc/HYJI-STATE.md
+- ~~No online lookups~~ — **narrow exception since v1.0.5**: user-initiated metadata lookup (Crossref/arXiv, `http_get_text` allowlist). Still no bulk scraping/auto-downloading.

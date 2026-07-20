@@ -75,6 +75,7 @@ pub fn run() {
             commands::get_paper,
             commands::update_paper,
             commands::delete_paper,
+            commands::http_get_text,
             take_pending_open_files,
             get_backup_config,
             set_backup_config,

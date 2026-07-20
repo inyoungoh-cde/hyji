@@ -47,7 +47,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Highlights, Underlines & Memos** — highlight/underline/strikeout in 4 colors, margin memos, and true two-way interop: "Save annotations to PDF" writes standard annotations that Adobe Acrobat and other viewers can display and edit, and annotations made elsewhere can be imported into HYJI as editable ones (Tools → Import Annotations from PDF).
 
-- **Smart Paste** — Paste BibTeX, citation string, arXiv ID, or RIS — HYJI auto-detects the format and parses all fields. Supports @article, @book, @phdthesis, and more.
+- **Smart Paste & metadata lookup** — Paste BibTeX, citation string, arXiv ID, or RIS — HYJI auto-detects the format and parses all fields. Or click "Fetch metadata" to look the paper up on Crossref/arXiv from its DOI/arXiv ID (auto-detected in the PDF), with a confirm-before-overwrite diff.
 
 - **Export dialog** — Choose output format (LaTeX / RIS / Word / CSV / clipboard), citation style (IEEE / ACS / Nature / APA / MLA), journal name format (full / abbreviated), and starting number. Live preview included.
 
@@ -162,6 +162,9 @@ Please keep PRs focused — one feature or fix per PR.
 ---
 
 ## Changelog
+
+### v1.0.5 (Jul 2026)
+- Fetch metadata online: one click looks the paper up on Crossref/arXiv (DOI/arXiv ID auto-detected from the PDF) with a confirm-before-overwrite diff
 
 ### v1.0.4 (Jul 2026)
 - Library-wide full-text search (Ctrl+Shift+F): searches titles *and* the text inside every PDF (Korean + English), jumps to the matching page
