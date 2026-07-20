@@ -122,7 +122,7 @@
 ## 6.5 Known issues & deferred work (migrated from todolist.md / post_v100_wip.md, 2026-07-20)
 
 Open issues:
-- **`::selection` bleed at whitespace spans during drag** — pdf.js text-layer whitespace spans carry large `transform:scaleX`; the browser renders the selection background at the transformed size, causing a brief full-line flash when the cursor crosses a space. Current mitigation (commit `d831def`): mark ALL spans `.pdfjs-space` (transparent selection), un-mark only confirmed word spans (`scaleX <= 1.5` + visible text) — **effectiveness still unverified**; test with `check/A mixed reality-based remote collaboration framework using improved pose.pdf` and the `[hyji] pageN: X word, Y space spans` console log. If bleed persists, the remaining suspect is inter-span gaps (no DOM element), which no span marking can fix. Stored highlights are unaffected (mergeToLineRects); only the live drag preview.
+- ~~`::selection` bleed at whitespace spans during drag~~ — **RESOLVED in v1.0.7** (user-verified 2026-07-20). The d831def `scaleX<=1.5` marking over-matched word spans and hid selection feedback entirely; v1.0.7 suppresses `::selection` only on whitespace-only spans. Selection is visible and bleed is acceptable. (Historical note: an earlier "full-width bleed band" observation turned out to be the internal-link flash indicator, not selection.)
 - **Highlight overlap edge cases** — adjacent `getClientRects()` rects can overlap slightly despite SVG group opacity.
 - **Print highlight position** — stored rects are PDF-point space, print renders at 3×; minor pixel-level drift possible.
 
