@@ -119,6 +119,20 @@
 7. **Competitor matrix**: 2026 feature/pricing snapshot of Zotero 7, Mendeley, Paperpile, ReadCube Papers, Sioyek, SumatraPDF, PDF-XChange, Drawboard, Obsidian+Zotero-integration — which "must-have" features do free tiers actually cover?
 8. **Cross-platform**: Gotchas shipping Tauri v2 apps on macOS (notarization, WebKit differences for pdf.js text layer) vs the current Windows/WebView2 build.
 
+## 6.5 Known issues & deferred work (migrated from todolist.md / post_v100_wip.md, 2026-07-20)
+
+Open issues:
+- **`::selection` bleed at whitespace spans during drag** — pdf.js text-layer whitespace spans carry large `transform:scaleX`; the browser renders the selection background at the transformed size, causing a brief full-line flash when the cursor crosses a space. Current mitigation (commit `d831def`): mark ALL spans `.pdfjs-space` (transparent selection), un-mark only confirmed word spans (`scaleX <= 1.5` + visible text) — **effectiveness still unverified**; test with `check/A mixed reality-based remote collaboration framework using improved pose.pdf` and the `[hyji] pageN: X word, Y space spans` console log. If bleed persists, the remaining suspect is inter-span gaps (no DOM element), which no span marking can fix. Stored highlights are unaffected (mergeToLineRects); only the live drag preview.
+- **Highlight overlap edge cases** — adjacent `getClientRects()` rects can overlap slightly despite SVG group opacity.
+- **Print highlight position** — stored rects are PDF-point space, print renders at 3×; minor pixel-level drift possible.
+
+Deferred (hard problems):
+- **Spatial drag selection for multi-column PDFs** — native selection follows DOM order, not visual order; needs rectangle-based text collection respecting column boundaries (canvas hit-test + x/y reorder).
+- **Internal link tooltip preview** — hover `[7]` → show reference text; blocked on reading-order extraction from two-column layouts (coordinate- and stream-order approaches both failed).
+- **Export Selected… disabled-state in native menu** — requires dynamic `set_enabled` updates from Rust.
+
+Next roadmap: see §6 research questions and `HYJI_STATE_research.md` — v1.0.5 candidate is online metadata lookup (Crossref → arXiv chain).
+
 ## 7. Repository shape (for code-level questions)
 
 ```
