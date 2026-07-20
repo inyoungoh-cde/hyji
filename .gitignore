@@ -5,3 +5,7 @@ src-tauri/target/
 *.db-journal
 .env
 public/pdfjs/
+
+# Internal docs — kept local, not published
+CLAUDE.md
+doc/
