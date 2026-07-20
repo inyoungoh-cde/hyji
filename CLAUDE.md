@@ -35,17 +35,19 @@ hyji/
 ├── src-tauri/          # Rust backend
 │   ├── src/
 │   │   ├── main.rs     # Tauri entry
-│   │   ├── lib.rs      # Builder setup, menu, PendingOpenFile, BackupState init
+│   │   ├── lib.rs      # Builder, menu, single-instance (PDF forward queue), PendingOpenFile, BackupState
 │   │   ├── commands.rs # Tauri IPC command handlers (placeholder stubs)
-│   │   └── backup.rs   # Auto-backup: config R/W, perform_backup, spawn_backup_loop
+│   │   └── backup.rs   # Auto-backup: config R/W, perform_backup, spawn_backup_loop, backup_on_exit
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── src/                # React frontend
 │   ├── App.tsx         # Root layout (3-panel with splitters)
 │   ├── stores/         # Zustand stores
 │   │   ├── papers.ts   # Paper CRUD, filters, sort
-│   │   ├── ui.ts       # Panel sizes, modal state, active paper
-│   │   └── projects.ts # Project/folder tree
+│   │   ├── ui.ts       # Panels, tabs (openPaperIds), focus mode, dark mode, search overlay, goTo requests
+│   │   ├── projects.ts # Project/folder tree
+│   │   ├── annotations.ts # Highlights/memos + note_links CRUD
+│   │   └── keywords.ts # Keyword fetch/auto-extract/regenerate
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── Sidebar.tsx       # Project tree + keyword graph
@@ -61,11 +63,11 @@ hyji/
 │   │   │   ├── KeywordGraph.tsx        # D3 force-directed mini graph
 │   │   │   └── KeywordGraphFullscreen.tsx # Full-screen D3 overlay (Ctrl+G)
 │   │   ├── pdf/
-│   │   │   ├── PdfCanvas.tsx     # pdf.js page rendering
-│   │   │   ├── TextLayer.tsx     # Text selection + highlight overlay
-│   │   │   ├── HighlightLayer.tsx# Rendered highlights with colors
-│   │   │   ├── ContextMenu.tsx   # Right-click: highlight, memo, send to tracker
-│   │   │   └── Toolbar.tsx       # Zoom, page nav, search, highlight color picker
+│   │   │   ├── PdfCanvas.tsx     # pdf.js rendering, text/annotation layers, scroll memory, dark mode class
+│   │   │   ├── HighlightLayer.tsx# Highlights (fill/underline/strikeout) + memo markers
+│   │   │   ├── MemoEditor.tsx    # Floating memo edit popup
+│   │   │   ├── ContextMenu.tsx   # Selection menu: markup rows (3 styles × 4 colors), memo, send-to
+│   │   │   └── Toolbar.tsx       # Page nav, zoom, badges, search box (opens overlay), dark toggle, print, save
 │   │   ├── tracker/
 │   │   │   ├── MetadataForm.tsx  # Title, authors, year, venue, code link
 │   │   │   ├── StatusBar.tsx     # Status, importance, date read
@@ -75,10 +77,11 @@ hyji/
 │   │   │   └── LinkedBullet.tsx  # Bullet with PDF anchor link
 │   │   ├── shared/
 │   │   │   ├── SmartPaste.tsx       # BibTeX / citation / arXiv ID / RIS parser modal
-│   │   │   ├── ImportDialog.tsx     # PDF import dialog (copy/link, project selector)
-│   │   │   ├── ExportDialog.tsx     # Export dialog with citation styles + format options
-│   │   │   ├── PreferencesDialog.tsx # Auto-backup & settings dialog
-│   │   │   ├── AboutModal.tsx       # About HYJI modal
+│   │   │   ├── ImportDialog.tsx     # PDF import dialog (copy/link, project selector, path dedup)
+│   │   │   ├── ExportDialog.tsx     # Export: .bib/.ris/Word/CSV/clipboard + citation styles
+│   │   │   ├── GlobalSearch.tsx     # Unified search overlay (library / this-document scope)
+│   │   │   ├── PreferencesDialog.tsx # Startup layout + auto-backup settings
+│   │   │   ├── AboutModal.tsx       # About HYJI modal (runtime version via getVersion)
 │   │   │   ├── KeyboardShortcutsModal.tsx # Keyboard shortcuts reference modal
 │   │   │   ├── Badge.tsx
 │   │   │   ├── Modal.tsx
@@ -86,8 +89,14 @@ hyji/
 │   ├── lib/
 │   │   ├── parser.ts      # BibTeX / citation / arXiv ID / RIS parsing logic
 │   │   ├── bibtex.ts      # Type-aware BibTeX generation from paper metadata
+│   │   ├── ris.ts         # RIS export (raw-BibTeX author recovery, whitespace-safe)
 │   │   ├── citations.ts   # Citation formatters: IEEE/ACS/Nature/APA/MLA
 │   │   ├── pdfMeta.ts     # Extract title/authors/abstract from PDF first page
+│   │   ├── pdfjsAssets.ts # cMap/standard-font/wasm URLs (synced by vite.config.ts → public/pdfjs)
+│   │   ├── pdfAnnotExport.ts # Write standard /Highlight,/Underline,/StrikeOut annots (rotation/CropBox aware)
+│   │   ├── pdfAnnotImport.ts # Scan foreign annotations + strip-after-import (take ownership)
+│   │   ├── ftsSearch.ts   # FTS5 trigram full-text index + search (LIKE fallback for 1-2 chars)
+│   │   ├── openPdf.ts     # importOrOpenPdf: dedup-by-path open (file assoc / single-instance)
 │   │   ├── venueMap.ts    # 247-entry venue lookup (full/abbr/abbr_nodots/code)
 │   │   ├── venues.json    # Venue data file (ISO 4 / CASSI)
 │   │   └── backup.ts      # Frontend wrapper for backup Tauri commands
@@ -170,6 +179,7 @@ CREATE TABLE annotations (
   selected_text TEXT DEFAULT '',
   color TEXT DEFAULT '#ffd166',    -- highlight color hex
   memo_text TEXT DEFAULT '',       -- for memo type
+  style TEXT DEFAULT 'fill',       -- v1.0.3: 'fill' | 'underline' | 'strikeout'
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -195,6 +205,16 @@ CREATE INDEX idx_papers_project ON papers(project_id);
 CREATE INDEX idx_annotations_paper ON annotations(paper_id);
 CREATE INDEX idx_keywords_paper ON keywords(paper_id);
 CREATE INDEX idx_keywords_keyword ON keywords(keyword);
+
+-- v1.0.4: library full-text search (bundled SQLite has FTS5 enabled)
+CREATE VIRTUAL TABLE pdf_fts USING fts5(
+  paper_id UNINDEXED, page UNINDEXED, body, tokenize='trigram'
+);
+CREATE TABLE fts_index_meta (       -- skip-if-unchanged index bookkeeping
+  paper_id TEXT PRIMARY KEY,
+  pdf_path TEXT NOT NULL,
+  indexed_at TEXT DEFAULT (datetime('now'))
+);
 ```
 
 ---
@@ -251,51 +271,53 @@ Three vertical sections. PROJECTS takes maximum space; PAPERS controls and KEYWO
 
 Built on **pdf.js** running inside a React component.
 
-**Tab bar** (above toolbar):
-- Paper title as tab label (with 📄 icon)
-- ✕ closes paper → returns to Dashboard
-- ＋ triggers PDF import
+**Tab strip** (above toolbar, browser-style — v1.0.1):
+- One tab per open paper (`ui.openPaperIds`); click activates, ✕ / middle-click / Ctrl+W closes, ＋ imports
+- Per-tab zoom memory + per-file scroll-position memory; open tabs persist across sessions
+- Double-click the active tab title to rename the paper
+- **Single instance**: launching HYJI with a PDF while it's already running forwards the path (Rust-side queue in `PendingOpenFile`) → opens as a tab; paths dedup against existing `pdf_path` (openPdf.ts)
+- Closing the last tab → Dashboard (exits Focus Mode if active)
 
 **Toolbar**:
 - Page nav: ‹ N / total ›
 - Zoom: − % + 1:1 Fit
 - Read-only **Status badge** + **Importance badge**
-- Search toggle → inline search with ▲▼ navigation
-- 🖨 Print (system print dialog)
-- 💾 Save highlights to PDF (pdf-lib, burns highlights only — planned)
+- Search box → opens the unified search overlay scoped to this document; inline ▲▼ match navigator appears after a jump
+- 🌓 PDF dark mode toggle (Ctrl+D) — CSS-inverts the canvas only; overlay/selection colors stay true
+- 🖨 Print (Ctrl+P; high-res render, annotations burned in)
+- 💾 Save annotations to PDF — writes standard /Highlight, /Underline, /StrikeOut annotations (visible/editable in Adobe; rotation + CropBox aware)
 
 **Rendering**:
-- Canvas rendering for pages + transparent text layer on top for selection
-- Smooth scrolling between pages (continuous scroll mode)
-- Zoom: fit-width (default), fit-page, manual (50%-400%), Ctrl+Wheel zoom
-- Page navigation: scroll, page number input
-- In-PDF text search with match highlighting
+- Canvas rendering + transparent text layer; cMaps/standard fonts/wasm bundled (public/pdfjs) so CJK/CID-font PDFs render
+- Continuous scroll, fit-width default, manual zoom, Ctrl+Wheel
+- Annotations from other viewers render via their appearance streams
 
 **Annotations**:
-- **Text highlight**: Select text → right-click → "Highlight" with color picker (yellow, green, blue, pink, orange). Highlights are stored in the `annotations` table and rendered as colored overlays on the text layer.
-- **Margin memo**: Right-click on highlighted area → "Add memo" → small floating note icon appears at the margin. Click to expand/edit.
-- **Send to Tracker**: Select text → right-click → "Send to Differentiation" or "Send to Questions". This creates:
-  1. A highlight annotation in the PDF (with a distinct color, e.g. coral for differentiation, purple for questions)
-  2. A new bullet in the corresponding tracker field, prefixed with the selected text (truncated if long)
-  3. A `note_links` record connecting the bullet to the annotation
-- When user clicks a linked bullet in the tracker panel, the PDF viewer scrolls to the exact page and highlights the linked annotation with a brief flash animation.
+- **Text markup**: selection menu offers Highlight / Underline / Strikeout rows, each in 4 colors (`annotations.style`)
+- **Margin memo**: anchored floating note (📝 icon at margin), click to expand/edit
+- **Send to Tracker**: creates annotation + bullet + `note_links` record (coral = differentiation, purple = questions); linked 🔗 bullet click scrolls PDF + flash
+- **Interop import**: Tools → Import Annotations from PDF — foreign Highlight/Underline/StrikeOut/Squiggly/Text annots become editable HYJI annotations (comments → memos); originals are stripped from the file after confirmation (HYJI takes ownership; skips `T=HYJI` self-authored)
 
-**Context menu** (right-click on text selection):
+**Context menu** (auto-appears after drag-select; right-click too):
 ```
-┌──────────────────────────┐
-│ 🟡 Highlight yellow      │
-│ 🟢 Highlight green       │
-│ 🔵 Highlight blue        │
-│ 🩷 Highlight pink        │
-│ ─────────────────────── │
-│ 📝 Add memo              │
-│ ─────────────────────── │
-│ ✦ Send to Differentiation │
-│ ? Send to Questions       │
-│ ─────────────────────── │
-│ 📋 Copy text              │
-└──────────────────────────┘
+┌───────────────────────────────┐
+│ "selected text preview…"      │
+│ ───────────────────────────── │
+│ Highlight  ● ● ● ●            │
+│ Underline  ‗ ‗ ‗ ‗            │
+│ Strikeout  ─ ─ ─ ─            │
+│ ───────────────────────────── │
+│ 📝 Add memo                   │
+│ ✦ Send to Differentiation     │
+│ ? Send to Questions           │
+│ 📋 Copy text                  │
+└───────────────────────────────┘
 ```
+
+**Unified search** (v1.0.4):
+- One Spotlight-style overlay (`GlobalSearch.tsx`): Ctrl+Shift+F = library scope (metadata + all PDF text), Ctrl+F / toolbar box = same overlay with "This document only" checked
+- FTS5 trigram index per page (`pdf_fts`), LIKE fallback for 1–2 char queries (short Korean terms), background indexing on launch/import, on-demand indexing for document scope
+- Selecting a hit opens the paper at that page and carries the query into the inline match navigator
 
 ### 5. Tracker panel
 
@@ -485,21 +507,21 @@ File
 ├── Import PDF...             Ctrl+O
 ├── Smart Paste               Ctrl+N
 ├── ──────
+├── Print...                  Ctrl+P
+├── ──────
 ├── Selection Mode            Ctrl+Shift+S
-├── Export Selected...        (disabled when nothing selected)
+├── Export Selected...
 ├── Export All...
 ├── ──────
-├── Preferences...
 └── Exit
 
 Edit
 ├── Undo                      Ctrl+Z
 ├── Redo                      Ctrl+Shift+Z
 ├── ──────
-├── Find in PDF               Ctrl+F
-├── Find Paper                Ctrl+Shift+F
+├── Find in PDF               Ctrl+F   (unified search overlay, document scope)
+├── Find Paper                Ctrl+Shift+F  (unified search overlay, library scope)
 ├── ──────
-├── Select Mode               Ctrl+Shift+S
 └── Delete Paper
 
 View
@@ -507,6 +529,7 @@ View
 ├── Toggle Tracker Panel      Ctrl+J
 ├── ──────
 ├── Focus Mode                Ctrl+L
+├── PDF Dark Mode             Ctrl+D
 ├── ──────
 ├── Zoom In                   Ctrl+=
 ├── Zoom Out                  Ctrl+-
@@ -523,9 +546,14 @@ View
 Tools
 ├── Extract PDF Metadata
 ├── Regenerate Keywords
+├── Import Annotations from PDF...
+├── Rebuild Search Index...
 ├── ──────
 ├── Database Backup...
 ├── Restore from Backup...
+├── ──────
+├── Reset to Blank (Clear All Data)...
+├── ──────
 └── Preferences...
 
 Help
@@ -533,6 +561,10 @@ Help
 ├── About HYJI
 └── GitHub Repository
 ```
+
+Menu items whose handler lives inside a panel component (new-project, selection-mode,
+export-*, keyword-graph, expand-metadata) auto-show that panel first if it's hidden
+(dispatch bridge in App.tsx). Other per-tab shortcuts: Ctrl+W closes the active tab.
 
 ---
 
@@ -619,6 +651,21 @@ Help
 - [x] Auto-backup — Rust: BackupConfig (hyji_config.json), spawn_backup_loop (60s thread), perform_backup (file copy + rotation); frontend markDbDirty wired to all stores
 - [x] Preferences dialog — enable/folder/interval/only-on-change/keep-N controls; Backup now button; last backup timestamp + size display
 
+### Phase 1.4 — Tabs, Interop, CJK (v1.0.1) ✅
+- [x] Multi-tab PDF viewing — tab strip, per-tab zoom/scroll memory, session-restored tabs, Ctrl+W
+- [x] Single-instance app — second launch forwards PDF path via Rust queue → tab in running window
+- [x] CJK/CID font rendering — pdfjs cmaps/standard_fonts/wasm synced to public/pdfjs by vite.config.ts
+- [x] Real /Highlight annotation export (pdf-lib, QuadPoints + Multiply AP, rotation/CropBox aware)
+- [x] RIS export in Export dialog; File → Print… (Ctrl+P); startup layout preference; fs scope = all drives
+- [x] Interaction fixes: app-level data bootstrap, dedup imports, duplicate menu handlers, focus-mode dead-ends
+
+### Phase 1.5 — Dark Mode, Markup, Search (v1.0.2–v1.0.4) ✅
+- [x] PDF dark mode (Ctrl+D) — canvas-only CSS inversion, persisted
+- [x] Abstract field + DOI ↗ button in tracker; backup-on-exit; runtime version in About
+- [x] Underline/Strikeout markup (annotations.style) — viewer, print, standard PDF export
+- [x] Tools → Import Annotations from PDF (take-ownership import of foreign annotations)
+- [x] Library full-text search — FTS5 trigram + LIKE fallback, unified overlay (Ctrl+F/Ctrl+Shift+F), background indexing, Tools → Rebuild Search Index
+
 ### Phase 1.3 — Polish + Bug Fixes (v1.0.0) ✅
 - [x] Highlight gaps filled — `mergeToLineRects` merges per-line rects so stored highlights show as continuous bands (no gaps at spaces)
 - [x] Empty bullets hidden — `BulletEditor.renderBullets` skips bullets with empty `cleanText`; index alignment for `note_links` preserved
@@ -679,6 +726,14 @@ What to ship per release:
 
 9. **Papers inline in project tree**: Papers appear as 📄 items under their project folder. The separate paper card list is replaced by a compact filter/sort/select control bar. Navigation is now file-browser style.
 
+10. **Real PDF annotations on export, ownership on import** (v1.0.1–v1.0.3): "Save annotations to PDF" writes standard `/Highlight`/`/Underline`/`/StrikeOut` objects (QuadPoints + appearance streams, `T=HYJI`) so other viewers can display *and edit* them. Importing foreign annotations copies them into the DB **and strips the originals from the file** — one source of truth, no double rendering, deletes behave correctly.
+
+11. **FTS5 trigram over external tokenizers** (v1.0.4): the bundled SQLite already ships FTS5 + trigram, giving CJK substring search with zero new dependencies. 1–2 character queries fall back to a LIKE scan. A dictionary tokenizer (lindera) stays an option if morphological quality ever matters more than footprint.
+
+12. **One search overlay, two scopes**: in-document search (Ctrl+F) is the same UI as library search (Ctrl+Shift+F) with a "This document only" filter — not a separate feature. Selecting a hit hands the query to the inline ▲▼ match navigator.
+
+13. **App-level data bootstrap**: papers/projects/keywords/FTS loading lives in App.tsx, never inside a panel component — panels can be hidden (viewer-only startup layout, focus mode) and data must not depend on their mount state.
+
 ---
 
 ## Non-goals for v1.0
@@ -689,4 +744,4 @@ What to ship per release:
 - No mobile version
 - ~~No citation style formatting~~ — **implemented in v0.1.7** (IEEE/ACS/Nature/APA/MLA via Export dialog)
 - No PDF editing (no form fill, no page manipulation)
-- No web scraping (no auto-download from arXiv/Semantic Scholar)
+- No web scraping (no auto-download from arXiv/Semantic Scholar) — online *metadata lookup* (Crossref/arXiv) is the v1.0.5 roadmap candidate, see doc/HYJI-STATE.md
