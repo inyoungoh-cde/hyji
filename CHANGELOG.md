@@ -11,7 +11,9 @@ All notable changes to HYJI will be documented in this file.
 
 ### Fixed
 
-- **Sharp PDF rendering on high-DPI and secondary monitors** — page canvases were cached per zoom level only, so moving the window to a monitor with a different display scale (or changing Windows DPI) kept the old bitmap and the OS stretched it into blur. HYJI now tracks `devicePixelRatio` and re-renders every page the moment it changes, with the text layer and highlight overlay rebuilt to match.
+- **Sharp PDF rendering when moving between monitors with different display scales** (e.g. a 125% main monitor → a 100% portrait monitor). Two layers of the bug were fixed:
+  - Page canvases were cached per zoom level only, so after a monitor move the old bitmap was resampled to the new pixel ratio and every page turned blurry. The render cache now keys on zoom × `devicePixelRatio` and all pages re-render on a ratio change (text layer and highlight overlay rebuilt to match).
+  - The ratio change itself was easy to miss: WebView2 can fire the resolution media-query event *before* `devicePixelRatio` reports the new value, and no further signal follows — the stale, blurry canvas then sticks (this is exactly what the first 2.1 build shipped with). Detection now uses three redundant signals (resolution media query, viewport resize, native Windows DPI-change event via Tauri) and re-reads the ratio several times after each until it settles. Verified on a 125% → 100% portrait-monitor move: canvas backing now matches the monitor 1:1 right after the move.
 - **Focus Mode stays crisp on resize** — Focus Mode computed its fit-to-width scale once on entry; resizing the window (or moving it to a portrait/secondary monitor) afterwards stretched the existing canvas instead of re-rendering. The viewer now watches its own size while Focus Mode is active and re-renders at the exact new fit-width scale.
 
 ## [2.0] - 2026-07-20

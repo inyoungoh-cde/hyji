@@ -161,16 +161,59 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   // devicePixelRatio changes when the window moves between monitors with
   // different DPI (or the user changes display scaling). The canvas bitmap
   // was rasterized at the old ratio, so it must be re-rendered — otherwise
-  // the OS stretches it and every page turns blurry. matchMedia on the
-  // current resolution fires once per ratio change; re-registering against
-  // the new ratio keeps listening across multiple monitor hops.
+  // it is resampled to the new ratio and every page turns blurry.
+  //
+  // A single matchMedia listener is NOT enough: during a cross-monitor move
+  // WebView2 can fire the media-query change while window.devicePixelRatio
+  // still reads the old value, and once that one event is consumed no further
+  // signal arrives — the stale canvas then sticks until some unrelated
+  // re-render. So listen to every signal that accompanies a DPI change
+  // (media query, viewport resize, native WM_DPICHANGED via Tauri) and after
+  // each one re-read the ratio a few times with delays until it settles.
   const [dpr, setDpr] = useState(() => window.devicePixelRatio || 1);
   useEffect(() => {
-    const mq = window.matchMedia(`(resolution: ${dpr}dppx)`);
-    const onChange = () => setDpr(window.devicePixelRatio || 1);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [dpr]);
+    let disposed = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const sync = () => {
+      [0, 150, 600].forEach((ms) => {
+        timers.push(setTimeout(() => {
+          if (disposed) return;
+          const now = window.devicePixelRatio || 1;
+          setDpr((prev) => (prev === now ? prev : now));
+        }, ms));
+      });
+    };
+
+    let mq: MediaQueryList | null = null;
+    const onMq = () => { sync(); arm(); };
+    const arm = () => {
+      mq?.removeEventListener("change", onMq);
+      mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      mq.addEventListener("change", onMq);
+    };
+    arm();
+
+    window.addEventListener("resize", sync);
+    document.addEventListener("visibilitychange", sync);
+
+    let unlisten: (() => void) | null = null;
+    import("@tauri-apps/api/window")
+      .then(({ getCurrentWindow }) => getCurrentWindow().onScaleChanged(sync))
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => { /* non-Tauri contexts: remaining signals still cover */ });
+
+    return () => {
+      disposed = true;
+      timers.forEach(clearTimeout);
+      mq?.removeEventListener("change", onMq);
+      window.removeEventListener("resize", sync);
+      document.removeEventListener("visibilitychange", sync);
+      unlisten?.();
+    };
+  }, []);
 
   // Load document
   useEffect(() => {
