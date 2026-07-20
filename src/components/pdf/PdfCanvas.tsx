@@ -393,11 +393,21 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
           const cr = parseInt(hex.slice(1, 3), 16);
           const cg = parseInt(hex.slice(3, 5), 16);
           const cb = parseInt(hex.slice(5, 7), 16);
-          // Match viewer opacity: highlight 0.38, memo 0.18
-          ctx.globalAlpha = ann.type === "memo" ? 0.18 : 0.38;
+          const lineStyle = ann.style === "underline" || ann.style === "strikeout" ? ann.style : null;
+          // Match viewer opacity: highlight 0.38, memo 0.18, lines 0.9
+          ctx.globalAlpha = lineStyle ? 0.9 : ann.type === "memo" ? 0.18 : 0.38;
           ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
           for (const r of pageRects) {
-            ctx.fillRect(r.x * PRINT_SCALE, r.y * PRINT_SCALE, r.w * PRINT_SCALE, r.h * PRINT_SCALE);
+            if (lineStyle) {
+              const h = r.h * PRINT_SCALE;
+              const t = Math.max(1.5, h * 0.07);
+              const y = lineStyle === "underline"
+                ? r.y * PRINT_SCALE + h - t
+                : r.y * PRINT_SCALE + h / 2 - t / 2;
+              ctx.fillRect(r.x * PRINT_SCALE, y, r.w * PRINT_SCALE, t);
+            } else {
+              ctx.fillRect(r.x * PRINT_SCALE, r.y * PRINT_SCALE, r.w * PRINT_SCALE, r.h * PRINT_SCALE);
+            }
           }
         }
         ctx.globalAlpha = 1;

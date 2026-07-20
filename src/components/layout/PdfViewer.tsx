@@ -42,6 +42,10 @@ export function PdfViewer() {
 
   const [scale, setScale] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
+  // Bumped to force a full PdfCanvas remount after the PDF file itself was
+  // rewritten in place (e.g. importing external annotations strips them).
+  const [pdfReloadNonce, setPdfReloadNonce] = useState(0);
+  const docRef = useRef<PDFDocumentProxy | null>(null);
   const [extractModal, setExtractModal] = useState<{ title: string; paperId: string } | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const pdfCanvasRef = useRef<PdfCanvasHandle>(null);
@@ -65,6 +69,7 @@ export function PdfViewer() {
   const [backScrollTop, setBackScrollTop] = useState<number | null>(null);
 
   const onDocLoaded = useCallback((doc: PDFDocumentProxy) => {
+    docRef.current = doc;
     setTotalPages(doc.numPages);
     setCurrentPage(1);
   }, []);
@@ -160,7 +165,7 @@ export function PdfViewer() {
   );
 
   const handleHighlight = useCallback(
-    async (color: string) => {
+    async (color: string, style: "fill" | "underline" | "strikeout" = "fill") => {
       if (!contextMenu || !activePaperId) return;
       await createAnnotation({
         paper_id: activePaperId,
@@ -168,6 +173,7 @@ export function PdfViewer() {
         page: contextMenu.page,
         selected_text: contextMenu.selectedText,
         color,
+        style,
         rects_json: JSON.stringify(contextMenu.rects || []),
       });
       setContextMenu(null);
@@ -398,6 +404,67 @@ export function PdfViewer() {
         if (confirmed) {
           useUiStore.getState().closePaperTab(id);
           deletePaper(id);
+        }
+      }),
+
+      onMenuEvent("import-annotations", async () => {
+        const { message, ask } = await import("@tauri-apps/plugin-dialog");
+        const id = useUiStore.getState().activePaperId;
+        const paper = usePapersStore.getState().papers.find((p) => p.id === id);
+        if (!id || !paper?.pdf_path) {
+          await message("Open a paper with a PDF first.", { title: "Import Annotations", kind: "info" });
+          return;
+        }
+        const doc = docRef.current;
+        if (!doc) {
+          await message("The PDF is still loading — try again in a moment.", { title: "Import Annotations", kind: "info" });
+          return;
+        }
+        try {
+          const { scanExternalAnnotations, removeAnnotationsFromPdf } = await import("../../lib/pdfAnnotImport");
+          const found = await scanExternalAnnotations(doc);
+          if (found.length === 0) {
+            await message("No annotations from other PDF viewers were found in this file.", { title: "Import Annotations", kind: "info" });
+            return;
+          }
+          const confirmed = await ask(
+            `Found ${found.length} annotation(s) made in other PDF viewers (highlights, underlines, notes).\n\nImport them into HYJI? They become editable here, and the originals are removed from the PDF file — "Save annotations to PDF" writes everything back.`,
+            { title: "Import Annotations", kind: "info" }
+          );
+          if (!confirmed) return;
+
+          // Compute the cleaned file first, then persist to DB, then rewrite
+          // the file — a write failure leaves annotations safe in the DB.
+          const { readFile, writeFile } = await import("@tauri-apps/plugin-fs");
+          const bytes = await readFile(paper.pdf_path);
+          const cleaned = await removeAnnotationsFromPdf(bytes, found);
+
+          const { createAnnotation } = useAnnotationsStore.getState();
+          for (const a of found) {
+            await createAnnotation({
+              paper_id: id,
+              type: a.type,
+              page: a.page,
+              selected_text: "",
+              color: a.color,
+              rects_json: JSON.stringify(a.rects),
+              memo_text: a.contents,
+              style: a.style,
+            });
+          }
+
+          try {
+            await writeFile(paper.pdf_path, cleaned);
+            setPdfReloadNonce((n) => n + 1);
+            await message(`Imported ${found.length} annotation(s) into HYJI.`, { title: "Import Annotations", kind: "info" });
+          } catch (writeErr) {
+            await message(
+              `Imported ${found.length} annotation(s), but the PDF file could not be updated (${String(writeErr)}).\nThe originals remain in the file, so they may appear doubled.`,
+              { title: "Import Annotations", kind: "warning" }
+            );
+          }
+        } catch (e) {
+          await message(`Import failed: ${String(e)}`, { title: "Import Annotations", kind: "error" });
         }
       }),
 
@@ -678,6 +745,7 @@ export function PdfViewer() {
 
       {activePaper && hasPdf && (
         <PdfCanvas
+          key={`${activePaper.id}:${pdfReloadNonce}`}
           ref={pdfCanvasRef}
           filePath={activePaper.pdf_path}
           scale={scale}

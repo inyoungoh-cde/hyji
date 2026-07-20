@@ -110,13 +110,19 @@ export async function exportAnnotationsToPdf(
 
     const [cr, cg, cb] = hexToRgb01(ann.color.slice(0, 7));
 
+    const style =
+      ann.style === "underline" || ann.style === "strikeout" ? ann.style : "fill";
+    const subtype =
+      style === "underline" ? "Underline" : style === "strikeout" ? "StrikeOut" : "Highlight";
+
     for (const [pageNum, pageRects] of byPage) {
       const page = pages[pageNum - 1];
       if (!page) continue;
       const toUser = viewportToUserSpace(page);
 
       const quads: number[] = [];
-      const ops: string[] = ["/G0 gs", `${cr.toFixed(4)} ${cg.toFixed(4)} ${cb.toFixed(4)} rg`];
+      const fillOps: string[] = ["/G0 gs", `${cr.toFixed(4)} ${cg.toFixed(4)} ${cb.toFixed(4)} rg`];
+      const strokeOps: string[] = [`${cr.toFixed(4)} ${cg.toFixed(4)} ${cb.toFixed(4)} RG`];
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
       for (const r of pageRects) {
@@ -130,29 +136,39 @@ export async function exportAnnotationsToPdf(
         const yTop = Math.max(ay, by);
         // QuadPoints order: upper-left, upper-right, lower-left, lower-right
         quads.push(x1, yTop, x2, yTop, x1, yBot, x2, yBot);
-        ops.push(`${x1.toFixed(2)} ${yBot.toFixed(2)} ${(x2 - x1).toFixed(2)} ${(yTop - yBot).toFixed(2)} re`);
+        if (style === "fill") {
+          fillOps.push(`${x1.toFixed(2)} ${yBot.toFixed(2)} ${(x2 - x1).toFixed(2)} ${(yTop - yBot).toFixed(2)} re`);
+        } else {
+          const h = yTop - yBot;
+          const lw = Math.max(0.7, h * 0.07);
+          const y = style === "underline" ? yBot + lw / 2 : (yBot + yTop) / 2;
+          strokeOps.push(`${lw.toFixed(2)} w`, `${x1.toFixed(2)} ${y.toFixed(2)} m`, `${x2.toFixed(2)} ${y.toFixed(2)} l`, "S");
+        }
         minX = Math.min(minX, x1); maxX = Math.max(maxX, x2);
         minY = Math.min(minY, yBot); maxY = Math.max(maxY, yTop);
       }
-      ops.push("f");
+      fillOps.push("f");
       const rect = [minX, minY, maxX, maxY];
 
-      // Appearance stream: fill the quads with Multiply blend so the text
-      // underneath stays readable (marker-pen look) in viewers that honor /AP.
+      // Appearance stream. Fill (highlight): Multiply blend so text stays
+      // readable. Underline/StrikeOut: opaque stroked lines, no blend needed.
       const gs = context.obj({ Type: "ExtGState", BM: "Multiply", CA: 1, ca: 1 });
-      const apStream = context.stream(ops.join("\n"), {
-        Type: "XObject",
-        Subtype: "Form",
-        FormType: 1,
-        BBox: rect,
-        Resources: { ExtGState: { G0: gs } },
-      });
+      const apStream = context.stream(
+        (style === "fill" ? fillOps : strokeOps).join("\n"),
+        {
+          Type: "XObject",
+          Subtype: "Form",
+          FormType: 1,
+          BBox: rect,
+          Resources: style === "fill" ? { ExtGState: { G0: gs } } : {},
+        }
+      );
       const apRef = context.register(apStream);
 
       const contents = ann.type === "memo" ? (ann.memo_text || "") : "";
       const annotDict = context.obj({
         Type: "Annot",
-        Subtype: "Highlight",
+        Subtype: subtype,
         Rect: rect,
         QuadPoints: quads,
         C: [cr, cg, cb],

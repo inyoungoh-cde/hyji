@@ -105,6 +105,21 @@ function HighlightAnnotation({
     setCtxPos({ x: e.clientX, y: e.clientY });
   };
 
+  const style = annotation.style === "underline" || annotation.style === "strikeout"
+    ? annotation.style
+    : "fill";
+
+  // For line styles the visible mark is a thin bar; keep a transparent
+  // full-height rect underneath as the hover/right-click hit area.
+  const lineFor = (rect: Rect) => {
+    const h = rect.h * scale;
+    const thickness = Math.max(1.5, h * 0.07);
+    const y = style === "underline"
+      ? rect.y * scale + h - thickness
+      : rect.y * scale + h / 2 - thickness / 2;
+    return { y, thickness };
+  };
+
   return (
     <>
       {/* SVG group: opacity applied to the whole group so overlapping rects don't stack */}
@@ -113,22 +128,48 @@ function HighlightAnnotation({
         style={{ width: "100%", height: "100%", overflow: "visible" }}
       >
         <g
-          opacity={0.38}
+          opacity={style === "fill" ? 0.38 : 0.9}
           className="pointer-events-auto cursor-context-menu"
           onContextMenu={handleContextMenu}
         >
-          {rects.map((rect, i) => (
-            <rect
-              key={i}
-              x={rect.x * scale}
-              y={rect.y * scale}
-              width={rect.w * scale}
-              height={rect.h * scale}
-              fill={`rgb(${r}, ${g}, ${b})`}
-              rx="1"
-              style={isFlashing ? { animation: "hyji-flash 0.9s ease-out" } : undefined}
-            />
-          ))}
+          {rects.map((rect, i) => {
+            if (style === "fill") {
+              return (
+                <rect
+                  key={i}
+                  x={rect.x * scale}
+                  y={rect.y * scale}
+                  width={rect.w * scale}
+                  height={rect.h * scale}
+                  fill={`rgb(${r}, ${g}, ${b})`}
+                  rx="1"
+                  style={isFlashing ? { animation: "hyji-flash 0.9s ease-out" } : undefined}
+                />
+              );
+            }
+            const { y, thickness } = lineFor(rect);
+            return (
+              <g key={i}>
+                {/* invisible hit area over the full text line */}
+                <rect
+                  x={rect.x * scale}
+                  y={rect.y * scale}
+                  width={rect.w * scale}
+                  height={rect.h * scale}
+                  fill="transparent"
+                />
+                <rect
+                  x={rect.x * scale}
+                  y={y}
+                  width={rect.w * scale}
+                  height={thickness}
+                  fill={`rgb(${r}, ${g}, ${b})`}
+                  rx="0.5"
+                  style={isFlashing ? { animation: "hyji-flash 0.9s ease-out" } : undefined}
+                />
+              </g>
+            );
+          })}
         </g>
       </svg>
 
@@ -136,7 +177,7 @@ function HighlightAnnotation({
         <DeleteContextMenu
           x={ctxPos.x}
           y={ctxPos.y}
-          label="Delete highlight"
+          label={style === "fill" ? "Delete highlight" : style === "underline" ? "Delete underline" : "Delete strikeout"}
           onDelete={() => { setCtxPos(null); onDelete(); }}
           onClose={() => setCtxPos(null)}
         />

@@ -2,6 +2,13 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.3] - 2026-07-20
+
+### Added
+
+- **Underline & strikeout** — the selection context menu now offers Underline and Strikeout rows next to Highlight, in the same four colors. They render as clean lines in the viewer, survive printing, and export to PDF as standard `/Underline` and `/StrikeOut` annotations that other viewers understand.
+- **Import annotations from other viewers** — Tools → Import Annotations from PDF… finds highlights, underlines, strikeouts, and sticky notes created in Adobe Acrobat (or any other viewer) and imports them into HYJI as native, editable annotations. Comments on highlights and sticky-note text become HYJI memos. After a confirmation, the originals are moved out of the PDF file so nothing displays twice — "Save annotations to PDF" writes everything back in standard form.
+
 ## [1.0.2] - 2026-07-20
 
 ### Added

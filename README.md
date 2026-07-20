@@ -45,7 +45,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Multi-tab reading** — Open several papers in browser-style tabs; each tab remembers its zoom and reading position, and your open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a new tab in the running app.
 
-- **Highlights & Memos** — 5 highlight colors, margin memos, and true two-way interop: "Save annotations to PDF" writes standard annotations that Adobe Acrobat and other viewers can display and edit, and highlights made elsewhere show up in HYJI.
+- **Highlights, Underlines & Memos** — highlight/underline/strikeout in 4 colors, margin memos, and true two-way interop: "Save annotations to PDF" writes standard annotations that Adobe Acrobat and other viewers can display and edit, and annotations made elsewhere can be imported into HYJI as editable ones (Tools → Import Annotations from PDF).
 
 - **Smart Paste** — Paste BibTeX, citation string, arXiv ID, or RIS — HYJI auto-detects the format and parses all fields. Supports @article, @book, @phdthesis, and more.
 
@@ -160,6 +160,10 @@ Please keep PRs focused — one feature or fix per PR.
 ---
 
 ## Changelog
+
+### v1.0.3 (Jul 2026)
+- Underline & strikeout text markup (4 colors) — rendered, printed, and exported as standard PDF annotations
+- Tools → Import Annotations from PDF: highlights/underlines/notes made in Adobe & other viewers become editable HYJI annotations
 
 ### v1.0.2 (Jul 2026)
 - PDF dark mode (Ctrl+D) — inverted night reading with true-color highlights

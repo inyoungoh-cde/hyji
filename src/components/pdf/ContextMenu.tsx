@@ -18,7 +18,7 @@ const HIGHLIGHT_COLORS = [
 interface ContextMenuProps {
   state: PdfContextMenuState;
   onClose: () => void;
-  onHighlight: (color: string) => void;
+  onHighlight: (color: string, style?: "fill" | "underline" | "strikeout") => void;
   onAddMemo: () => void;
   onSendTo: (field: "differentiation" | "questions") => void;
   onCopy: () => void;
@@ -69,19 +69,10 @@ export function ContextMenu({ state, onClose, onHighlight, onAddMemo, onSendTo, 
       </div>
       <div className="border-t border-border my-1" />
 
-      {/* Highlight color picker */}
-      <div className="px-3 py-1.5 flex items-center gap-2">
-        <span className="text-small text-text-secondary mr-1">Highlight</span>
-        {HIGHLIGHT_COLORS.map((c) => (
-          <button
-            key={c.hex}
-            title={c.label}
-            className="w-5 h-5 rounded-full border border-border hover:scale-125 transition-transform"
-            style={{ backgroundColor: c.hex }}
-            onClick={() => onHighlight(c.hex)}
-          />
-        ))}
-      </div>
+      {/* Text markup: highlight / underline / strikeout, each in 4 colors */}
+      <MarkupRow label="Highlight" onPick={(hex) => onHighlight(hex, "fill")} swatch="fill" />
+      <MarkupRow label="Underline" onPick={(hex) => onHighlight(hex, "underline")} swatch="underline" />
+      <MarkupRow label="Strikeout" onPick={(hex) => onHighlight(hex, "strikeout")} swatch="strikeout" />
 
       <div className="border-t border-border my-1" />
       <button
@@ -110,6 +101,43 @@ export function ContextMenu({ state, onClose, onHighlight, onAddMemo, onSendTo, 
       >
         Copy text
       </button>
+    </div>
+  );
+}
+
+function MarkupRow({
+  label,
+  onPick,
+  swatch,
+}: {
+  label: string;
+  onPick: (hex: string) => void;
+  swatch: "fill" | "underline" | "strikeout";
+}) {
+  return (
+    <div className="px-3 py-1 flex items-center gap-2">
+      <span className="text-small text-text-secondary mr-1 w-[62px]">{label}</span>
+      {HIGHLIGHT_COLORS.map((c) => (
+        <button
+          key={c.hex}
+          title={`${label} — ${c.label}`}
+          className="w-5 h-5 rounded-full border border-border hover:scale-125 transition-transform flex items-center justify-center"
+          style={swatch === "fill" ? { backgroundColor: c.hex } : { backgroundColor: "transparent" }}
+          onClick={() => onPick(c.hex)}
+        >
+          {swatch !== "fill" && (
+            <span
+              className="block w-3"
+              style={{
+                height: 2,
+                backgroundColor: c.hex,
+                // strikeout swatch: line through the middle; underline: near bottom
+                transform: swatch === "underline" ? "translateY(4px)" : "none",
+              }}
+            />
+          )}
+        </button>
+      ))}
     </div>
   );
 }

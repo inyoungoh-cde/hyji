@@ -15,6 +15,7 @@ interface AnnotationsState {
     color: string;
     rects_json?: string;
     memo_text?: string;
+    style?: "fill" | "underline" | "strikeout";
   }) => Promise<Annotation>;
   updateAnnotation: (id: string, paperId: string, fields: Partial<Pick<Annotation, "memo_text" | "color">>) => Promise<void>;
   deleteAnnotation: (id: string, paperId: string) => Promise<void>;
@@ -48,9 +49,9 @@ export const useAnnotationsStore = create<AnnotationsState>((set, get) => ({
   createAnnotation: async (ann) => {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO annotations (paper_id, type, page, selected_text, color, rects_json, memo_text)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [ann.paper_id, ann.type, ann.page, ann.selected_text, ann.color, ann.rects_json ?? "[]", ann.memo_text ?? ""]
+      `INSERT INTO annotations (paper_id, type, page, selected_text, color, rects_json, memo_text, style)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [ann.paper_id, ann.type, ann.page, ann.selected_text, ann.color, ann.rects_json ?? "[]", ann.memo_text ?? "", ann.style ?? "fill"]
     );
     const rows = await db.select<Annotation[]>(
       "SELECT * FROM annotations WHERE paper_id = ? ORDER BY created_at DESC LIMIT 1",

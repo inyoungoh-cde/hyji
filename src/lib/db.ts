@@ -119,6 +119,10 @@ async function runMigrations(db: Database): Promise<void> {
     // Deduplicate keywords then enforce uniqueness to prevent race-condition duplicates
     `DELETE FROM keywords WHERE id NOT IN (SELECT MIN(id) FROM keywords GROUP BY paper_id, keyword)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_keywords_unique ON keywords(paper_id, keyword)`,
+    // v1.0.3 — text-markup styles (highlight fill / underline / strikeout).
+    // A new column instead of new 'type' values: the CHECK constraint on
+    // type is baked into existing DBs and can't be altered in place.
+    `ALTER TABLE annotations ADD COLUMN style TEXT DEFAULT 'fill'`,
   ];
   for (const sql of migrations) {
     try {

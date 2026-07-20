@@ -147,6 +147,7 @@ pub fn run() {
             let tools_menu = SubmenuBuilder::new(app, "Tools")
                 .text("extract-meta", "Extract PDF Metadata")
                 .text("regen-keywords", "Regenerate Keywords")
+                .text("import-annotations", "Import Annotations from PDF...")
                 .separator()
                 .text("db-backup", "Database Backup...")
                 .text("db-restore", "Restore from Backup...")

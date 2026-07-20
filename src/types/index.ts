@@ -57,6 +57,8 @@ export interface Paper {
   updated_at: string;
 }
 
+export type AnnotationStyle = "fill" | "underline" | "strikeout";
+
 export interface Annotation {
   id: string;
   paper_id: string;
@@ -66,6 +68,8 @@ export interface Annotation {
   selected_text: string;
   color: string;
   memo_text: string;
+  /** Text-markup style; rows from pre-v1.0.3 DBs default to "fill". */
+  style: AnnotationStyle;
   created_at: string;
 }
 
