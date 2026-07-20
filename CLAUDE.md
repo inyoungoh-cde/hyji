@@ -47,7 +47,8 @@ hyji/
 │   │   ├── ui.ts       # Panels, tabs (openPaperIds), focus mode, dark mode, search overlay, goTo requests
 │   │   ├── projects.ts # Project/folder tree
 │   │   ├── annotations.ts # Highlights/memos + note_links CRUD
-│   │   └── keywords.ts # Keyword fetch/auto-extract/regenerate
+│   │   ├── keywords.ts # Keyword fetch/auto-extract/regenerate
+│   │   └── network.ts  # v2.0: offline mode + first-lookup notice state (persisted)
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── Sidebar.tsx       # Project tree + keyword graph
@@ -74,7 +75,8 @@ hyji/
 │   │   │   ├── ClassificationBar.tsx # Task, input modality
 │   │   │   ├── BulletEditor.tsx  # contenteditable bullet note editor
 │   │   │   ├── NoteSection.tsx   # Summary / Differentiation / Questions
-│   │   │   └── LinkedBullet.tsx  # Bullet with PDF anchor link
+│   │   │   ├── LinkedBullet.tsx  # Bullet with PDF anchor link
+│   │   │   └── FetchMetadataButton.tsx # v1.0.5: Crossref/arXiv lookup button (+ v2.0 first-lookup notice)
 │   │   ├── shared/
 │   │   │   ├── SmartPaste.tsx       # BibTeX / citation / arXiv ID / RIS parser modal
 │   │   │   ├── ImportDialog.tsx     # PDF import dialog (copy/link, project selector, path dedup)
@@ -675,6 +677,20 @@ export-*, keyword-graph, expand-metadata) auto-show that panel first if it's hid
 - [x] Internal link flash extended to 3.5s (was 2s); height increased to 28px for visibility
 - [x] "Back to reading" floating button after internal link navigation — `PdfCanvasHandle.scrollToY` + `onInternalNavigate` callback
 
+### Phase 1.6 — Metadata Lookup + Dark-Mode Polish (v1.0.5–v1.0.7) ✅
+- [x] Online metadata lookup — tracker "Fetch metadata" button: Crossref → arXiv fallback (`metadataFetch.ts`); DOI/arXiv ID extracted from PDF text; Rust `http_get_text` with domain allowlist (`api.crossref.org`, `export.arxiv.org`) to bypass CORS
+- [x] Dark-mode image counter-invert — bitmap regions located via pdf.js operator list and counter-inverted so figures keep true colors while text stays light-on-dark (v1.0.6)
+- [x] Library search covers notes — Summary/Differentiation/Questions/Abstract matched in the search overlay (v1.0.6)
+- [x] File → Export Selected… grayed out when nothing selected (v1.0.6)
+- [x] Drag-selection highlight restored — whitespace-bleed suppression narrowed to whitespace-only spans (v1.0.7)
+
+### Phase 2.0 — Offline Mode + Network Privacy (v2.0) ✅
+- [x] Offline mode — Preferences "Network & privacy" section with toggle (`stores/network.ts`, persisted); ON = zero network requests, "Fetch metadata" disabled
+- [x] Network policy statement in Preferences — the only online feature is user-initiated metadata lookup; only DOI/arXiv ID is sent, directly to Crossref/arXiv
+- [x] First-lookup notice — one-time consent dialog before the first "Fetch metadata" explaining exactly what is sent where; Cancel sends nothing
+- [x] Cleaner `User-Agent` — identifies the app by GitHub repo URL only (personal email removed)
+- [x] Versioning simplified to two-part scheme (2.0, 2.1, …) — git tags/installer versions stay three-part (`v2.0.0`); pre-2.0 CHANGELOG entries renumbered with original tags noted
+
 ---
 
 ## Coding conventions
@@ -693,7 +709,7 @@ export-*, keyword-graph, expand-metadata) auto-show that panel first if it's hid
 
 ## Update / release workflow
 
-1. Push tag `v0.x.y` to GitHub
+1. Push tag `vX.Y.0` to GitHub (display version is two-part since 2.0 — e.g. release "2.1" = tag `v2.1.0`; installers require three-part versions)
 2. GitHub Actions builds `.msi` installer via Tauri bundler
 3. Creates GitHub Release with the `.msi` attached
 4. Tauri auto-updater checks GitHub releases on app launch
@@ -745,4 +761,4 @@ What to ship per release:
 - No mobile version
 - ~~No citation style formatting~~ — **implemented in v0.1.7** (IEEE/ACS/Nature/APA/MLA via Export dialog)
 - No PDF editing (no form fill, no page manipulation)
-- ~~No online lookups~~ — **narrow exception since v1.0.5**: user-initiated metadata lookup (Crossref/arXiv, `http_get_text` allowlist). Still no bulk scraping/auto-downloading.
+- ~~No online lookups~~ — **narrow exception since v1.0.5**: user-initiated metadata lookup (Crossref/arXiv, `http_get_text` allowlist). Still no bulk scraping/auto-downloading. Since v2.0: offline mode toggle guarantees zero network requests; first lookup shows a one-time consent notice.
