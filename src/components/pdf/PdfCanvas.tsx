@@ -4,6 +4,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { HighlightLayer } from "./HighlightLayer";
 import { PDFJS_ASSET_OPTIONS } from "../../lib/pdfjsAssets";
+import { useUiStore } from "../../stores/ui";
 import type { Annotation } from "../../types";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -82,6 +83,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   onInternalNavigate,
 }: PdfCanvasProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const pdfDarkMode = useUiStore((s) => s.pdfDarkMode);
   // Which file the currently laid-out pages belong to. Scroll events are only
   // recorded for that file — during a tab switch the collapsing old layout
   // fires a clamped scroll-to-0 that must not overwrite the new file's memory.
@@ -631,7 +633,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto bg-[#525659] hyji-pdf-scroll"
+      className={`flex-1 overflow-y-auto bg-[#525659] hyji-pdf-scroll ${pdfDarkMode ? "hyji-pdf-dark" : ""}`}
       onScroll={(e) => {
         if (loadedFileRef.current === filePath) {
           scrollMemory.set(filePath, e.currentTarget.scrollTop);

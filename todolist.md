@@ -1,6 +1,6 @@
 # HYJI — TODO List
 
-_Last updated: 2026-04-30 (v1.0.0)_
+_Last updated: 2026-07-20 (v1.0.2)_
 
 ---
 
@@ -24,25 +24,16 @@ _Last updated: 2026-04-30 (v1.0.0)_
 
 ## Quality / UX Improvements (future)
 
-- [ ] **Single-instance support**
-  - Double-clicking a second PDF while HYJI is running opens a second instance instead of routing the new file to the existing window
-  - Needs `tauri-plugin-single-instance` wired to the `open-file` event path
-
 - [ ] **Export Selected… grayed out in menu when nothing selected**
   - Currently shows a dialog if nothing selected; ideally the menu item itself is disabled
   - Requires dynamic menu state updates from Rust via `set_enabled` on menu item
 
-- [ ] **Auto-backup on exit**
-  - If DB is dirty when the window closes, perform one final backup
-  - Requires hooking into `tauri::RunEvent::ExitRequested`
+## Roadmap (from doc/HYJI_STATE_research.md — 2026-07)
 
-- [ ] **Abstract display in tracker panel**
-  - `abstract_text` column exists (added v0.1.7) but no UI to display it
-  - Add a collapsible Abstract section in the notes area or metadata section
-
-- [ ] **DOI → open in browser**
-  - `doi` field exists in tracker but is just a text input
-  - Add a "↗" button to open `https://doi.org/{doi}` in system browser
+- [ ] **v1.0.3 — Annotation write expansion**: Underline/StrikeOut writing (extend pdf-lib Highlight code) + import-to-edit of external annotations into HYJI DB
+- [ ] **v1.0.4 — Library full-text search**: SQLite FTS5 + CJK tokenizer (lindera-sqlite preferred; better-trigram fallback); index pdf.js-extracted text; note tauri-plugin-sql extension-loading constraint
+- [ ] **v1.0.5 — Online metadata lookup**: DOI/arXiv-ID extraction from PDF → Crossref → arXiv fallback chain (keyless), SQLite caching, confirm-before-overwrite UI
+- [ ] **Later (v1.2+)**: dark-mode image counter-invert, citation graph (Semantic Scholar/OpenAlex cache), OCR (verify WinRT package-identity constraint), macOS port
 
 ---
 
@@ -66,6 +57,21 @@ _Last updated: 2026-04-30 (v1.0.0)_
 ---
 
 ## Completed (all sessions)
+
+### v1.0.2 (2026-07-20)
+- [x] PDF dark mode (Ctrl+D, View menu, toolbar toggle) — inverted canvas only; highlights/selection colors stay true
+- [x] Abstract section in tracker metadata (abstract_text finally has UI)
+- [x] DOI ↗ open-in-browser button
+- [x] Auto-backup on exit (RunEvent::ExitRequested, dirty-only)
+- [x] AboutModal version now read at runtime via getVersion() (was hardcoded "1.0.0")
+
+### v1.0.1 (2026-07-20)
+- [x] Multi-tab PDF viewing (tab strip, per-tab zoom/scroll memory, session restore, Ctrl+W)
+- [x] Single-instance support — second launch forwards PDF to running window as a tab (Rust-side queue)
+- [x] CJK/CID font rendering (bundled cmaps/standard_fonts/wasm)
+- [x] Real /Highlight annotation export (Adobe-interop, rotation/CropBox aware); RIS export; Print menu (Ctrl+P)
+- [x] Startup layout preference (viewer-only mode); fs scope for all drives
+- [x] Interaction-gap fixes: annotations/data loading decoupled from panel visibility, duplicate imports/menus, focus-mode dead-ends, project-delete refresh
 
 ### v1.0.0 (2026-04-30)
 - [x] Highlight gaps filled — `mergeToLineRects` merges same-line rects; stored highlights show as continuous bands

@@ -43,6 +43,7 @@ const GROUPS: ShortcutGroup[] = [
       { label: "Find in PDF", keys: ["Ctrl", "F"] },
       { label: "Print PDF", keys: ["Ctrl", "P"] },
       { label: "Close tab", keys: ["Ctrl", "W"] },
+      { label: "PDF dark mode", keys: ["Ctrl", "D"] },
       { label: "Zoom in", keys: ["Ctrl", "="] },
       { label: "Zoom out", keys: ["Ctrl", "−"] },
       { label: "Fit width", keys: ["Ctrl", "0"] },

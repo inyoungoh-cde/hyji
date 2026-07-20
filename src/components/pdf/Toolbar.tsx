@@ -19,6 +19,8 @@ interface ToolbarProps {
   importance?: string;
   focusMode?: boolean;
   onToggleFocus?: () => void;
+  darkMode?: boolean;
+  onToggleDark?: () => void;
   onPrint?: () => void;
   onSave?: () => void;
 }
@@ -60,6 +62,8 @@ export function Toolbar({
   importance,
   focusMode,
   onToggleFocus,
+  darkMode,
+  onToggleDark,
   onPrint,
   onSave,
 }: ToolbarProps) {
@@ -216,6 +220,23 @@ export function Toolbar({
       ) : (
         <button onClick={onToggleSearch} className="px-2 py-0.5 rounded text-body text-text-secondary hover:bg-bg-tertiary transition-colors" title="Search (Ctrl+F)">
           Search
+        </button>
+      )}
+
+      {/* Dark mode toggle */}
+      {onToggleDark && (
+        <button
+          onClick={onToggleDark}
+          className={`px-1.5 py-0.5 rounded transition-colors flex items-center ${
+            darkMode
+              ? "text-accent bg-bg-tertiary"
+              : "text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary"
+          }`}
+          title={darkMode ? "PDF dark mode: on (Ctrl+D)" : "PDF dark mode: off (Ctrl+D)"}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.5a5.5 5.5 0 0 1 0 11V2.5z"/>
+          </svg>
         </button>
       )}
 

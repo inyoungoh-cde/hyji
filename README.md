@@ -161,6 +161,11 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v1.0.2 (Jul 2026)
+- PDF dark mode (Ctrl+D) — inverted night reading with true-color highlights
+- Abstract field in tracker metadata; DOI ↗ opens doi.org; backup-on-exit for dirty databases
+- About dialog shows the real app version
+
 ### v1.0.1 (Jul 2026)
 - Multi-tab PDF viewing with per-tab zoom/position memory and session restore; Ctrl+W closes a tab
 - Single-instance app — PDFs opened from Explorer land as tabs in the running window

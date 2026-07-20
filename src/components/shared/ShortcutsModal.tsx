@@ -51,6 +51,7 @@ const SHORTCUT_CATEGORIES: { label: string; shortcuts: [string, string][] }[] = 
     shortcuts: [
       ["Ctrl+P", "Print PDF"],
       ["Ctrl+W", "Close tab"],
+      ["Ctrl+D", "PDF dark mode"],
     ],
   },
 ];

@@ -75,6 +75,21 @@ body,
   background: rgba(255, 255, 255, 0.6);
 }
 
+/* PDF dark mode — invert the rendered canvas only (Lector/Sioyek-style
+   sub-100% invert keeps whites from glaring). Text layer, selection,
+   search highlights, and HYJI highlight overlays are NOT filtered, so
+   their colors stay true over the darkened page. */
+.hyji-pdf-dark {
+  background: #17191c !important;
+}
+.hyji-pdf-dark .hyji-pdf-pages canvas {
+  filter: invert(0.92) hue-rotate(180deg) contrast(0.95);
+}
+/* Not-yet-rendered pages: dark placeholder instead of white flash */
+.hyji-pdf-dark .hyji-pdf-pages > div {
+  background: #1d2025;
+}
+
 /* Tab strip: near-invisible 3px scrollbar so overflowing tabs stay tidy */
 .hyji-tab-scroll::-webkit-scrollbar {
   height: 3px;

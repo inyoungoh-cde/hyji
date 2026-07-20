@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-shell";
+import { getVersion } from "@tauri-apps/api/app";
 import iconUrl from "../../../src-tauri/icons/128x128.png";
 
-const VERSION = "1.0.0";
-const BUILD_INFO = "Apr 2026 — Windows 64-bit";
+const BUILD_INFO = "Windows 64-bit";
 const GITHUB_URL = "https://github.com/inyoungoh-cde/hyji";
 
 interface Props {
@@ -11,6 +11,12 @@ interface Props {
 }
 
 export function AboutModal({ onClose }: Props) {
+  // Version comes from tauri.conf.json at runtime — never hardcoded again
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion("?"));
+  }, []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -61,7 +67,7 @@ export function AboutModal({ onClose }: Props) {
 
         {/* Version */}
         <div style={{ fontSize: "1rem", color: "var(--text-secondary)", marginBottom: 14 }}>
-          Version {VERSION} ({BUILD_INFO})
+          Version {version} ({BUILD_INFO})
         </div>
 
         {/* Description */}

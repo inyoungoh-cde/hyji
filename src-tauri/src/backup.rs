@@ -157,6 +157,26 @@ pub fn perform_backup(app: &AppHandle) -> Result<(String, u64), String> {
     Ok((iso, size))
 }
 
+/// Final safety net: if auto-backup is enabled and the DB changed since the
+/// last backup, take one more backup as the app exits (the 60s loop may not
+/// have fired yet).
+pub fn backup_on_exit(app: &AppHandle) {
+    let state = app.state::<BackupState>();
+    let cfg: BackupConfig = match state.config.lock() {
+        Ok(g) => g.clone(),
+        Err(_) => return,
+    };
+    if !cfg.backup_enabled || cfg.backup_folder.trim().is_empty() {
+        return;
+    }
+    if !state.dirty.load(Ordering::Relaxed) {
+        return;
+    }
+    if let Err(e) = perform_backup(app) {
+        eprintln!("[hyji backup on exit] {e}");
+    }
+}
+
 pub fn spawn_backup_loop(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last_run = std::time::Instant::now()

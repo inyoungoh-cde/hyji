@@ -26,6 +26,7 @@ export function PdfViewer() {
   const openPaperIds = useUiStore((s) => s.openPaperIds);
   const closePaperTab = useUiStore((s) => s.closePaperTab);
   const focusMode = useUiStore((s) => s.focusMode);
+  const pdfDarkMode = useUiStore((s) => s.pdfDarkMode);
   const scrollToAnnotation = useUiStore((s) => s.scrollToAnnotation);
   const setScrollToAnnotation = useUiStore((s) => s.setScrollToAnnotation);
   const papers = usePapersStore((s) => s.papers);
@@ -278,6 +279,10 @@ export function PdfViewer() {
         const { activePaperId: id, closePaperTab: close } = useUiStore.getState();
         if (id) close(id);
       }
+      if (e.ctrlKey && e.key === "d") {
+        e.preventDefault();
+        useUiStore.getState().togglePdfDarkMode();
+      }
       if (e.ctrlKey && e.key === "l") {
         e.preventDefault();
         toggleFocusMode();
@@ -361,6 +366,7 @@ export function PdfViewer() {
       onMenuEvent("import-pdf", () => setImportOpen(true)),
       onMenuEvent("find-pdf", () => setShowSearch((s) => !s)),
       onMenuEvent("print-pdf", handlePrint),
+      onMenuEvent("pdf-dark-mode", () => useUiStore.getState().togglePdfDarkMode()),
       onMenuEvent("focus-mode", toggleFocusMode),
       onMenuEvent("regen-keywords", async () => {
         const id = useUiStore.getState().activePaperId;
@@ -641,6 +647,8 @@ export function PdfViewer() {
           importance={activePaper.importance}
           focusMode={focusMode}
           onToggleFocus={toggleFocusMode}
+          darkMode={pdfDarkMode}
+          onToggleDark={() => useUiStore.getState().togglePdfDarkMode()}
           onPrint={handlePrint}
           onSave={async () => {
             if (!activePaper?.pdf_path || paperAnnotations.length === 0) return;

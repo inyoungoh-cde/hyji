@@ -129,6 +129,7 @@ pub fn run() {
                 .text("toggle-tracker", "Toggle Tracker Panel\tCtrl+J")
                 .separator()
                 .text("focus-mode", "Focus Mode\tCtrl+L")
+                .text("pdf-dark-mode", "PDF Dark Mode\tCtrl+D")
                 .separator()
                 .text("zoom-in", "Zoom In\tCtrl+=")
                 .text("zoom-out", "Zoom Out\tCtrl+-")
@@ -179,6 +180,12 @@ pub fn run() {
                 let _ = window.emit("menu-event", id);
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running HYJI");
+        .build(tauri::generate_context!())
+        .expect("error while building HYJI")
+        .run(|app, event| {
+            // Last-chance backup of a dirty DB when the app is closing
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                backup::backup_on_exit(app);
+            }
+        });
 }

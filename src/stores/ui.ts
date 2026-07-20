@@ -94,6 +94,8 @@ interface UiState {
   keywordFilter: string | null;
   scrollToAnnotation: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null;
   textSize: TextSize;
+  /** Dark-mode PDF rendering (inverted canvas for night reading). */
+  pdfDarkMode: boolean;
   focusMode: boolean;
   preFocusState: PreFocusState | null;
 
@@ -107,6 +109,7 @@ interface UiState {
   setKeywordFilter: (keyword: string | null) => void;
   setScrollToAnnotation: (req: { page: number; selectedText: string; noteField?: string; rects_json?: string } | null) => void;
   setTextSize: (size: TextSize) => void;
+  togglePdfDarkMode: () => void;
   enterFocusMode: (snapshot: PreFocusState) => void;
   exitFocusMode: () => PreFocusState | null;
 }
@@ -144,6 +147,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   keywordFilter: null,
   scrollToAnnotation: null,
   textSize: loadTextSize(),
+  pdfDarkMode: loadBool("hyji:pdf-dark", false),
   focusMode: false,
   preFocusState: null,
 
@@ -216,6 +220,11 @@ export const useUiStore = create<UiState>((set, get) => ({
     localStorage.setItem("hyji:text-size", size);
     set({ textSize: size });
   },
+  togglePdfDarkMode: () =>
+    set((s) => {
+      persistPanel("hyji:pdf-dark", !s.pdfDarkMode);
+      return { pdfDarkMode: !s.pdfDarkMode };
+    }),
   enterFocusMode: (snapshot) =>
     set({
       focusMode: true,

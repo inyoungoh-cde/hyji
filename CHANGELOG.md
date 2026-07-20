@@ -2,6 +2,19 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.2] - 2026-07-20
+
+### Added
+
+- **PDF dark mode** — `Ctrl+D`, View → PDF Dark Mode, or the toolbar moon button inverts the rendered page for night reading (soft 92% inversion so whites don't glare). Highlight colors, text selection, and search matches keep their true colors over the darkened page. The setting persists across sessions.
+- **Abstract in the tracker panel** — the abstract stored since v0.1.7 finally has a UI: an editable Abstract field in the metadata section.
+- **DOI quick-open** — a `↗` button next to the DOI field opens the paper on doi.org in the system browser.
+- **Backup on exit** — if auto-backup is enabled and the database changed since the last backup, HYJI takes one final backup as it closes (the interval timer alone could miss recent edits).
+
+### Fixed
+
+- **About dialog version** — now read from the app manifest at runtime; it was hardcoded and still showed "1.0.0" after updates.
+
 ## [1.0.1] - 2026-07-20
 
 ### Added

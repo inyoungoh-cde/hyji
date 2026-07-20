@@ -246,11 +246,31 @@ export function TrackerPanel() {
                 value={activePaper.pages ?? ""}
                 onChange={(v) => handleChange("pages", v)}
               />
-              <FieldInput
-                label="DOI"
-                value={activePaper.doi ?? ""}
-                onChange={(v) => handleChange("doi", v)}
-              />
+              <div>
+                <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
+                  DOI
+                </label>
+                <div className="flex gap-1">
+                  <input
+                    value={activePaper.doi ?? ""}
+                    onChange={(e) => handleChange("doi", e.target.value)}
+                    className="w-full min-w-0 bg-bg-tertiary text-body text-text-primary rounded px-2 py-1 outline-none border border-transparent focus:border-accent/40 transition-colors selectable"
+                  />
+                  {activePaper.doi?.trim() && (
+                    <button
+                      onClick={async () => {
+                        const { open } = await import("@tauri-apps/plugin-shell");
+                        const doi = activePaper.doi.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+                        open(`https://doi.org/${doi}`);
+                      }}
+                      className="shrink-0 px-1.5 rounded text-body text-text-tertiary hover:text-accent hover:bg-bg-tertiary transition-colors"
+                      title="Open on doi.org"
+                    >
+                      ↗
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             {/* Status + Importance */}
             <div className="grid grid-cols-2 gap-2 mb-3">
@@ -282,6 +302,19 @@ export function TrackerPanel() {
                 label="Link"
                 value={activePaper.link}
                 onChange={(v) => handleChange("link", v)}
+              />
+            </div>
+            {/* Abstract — stored since v0.1.7, now finally visible */}
+            <div className="mb-3">
+              <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
+                Abstract
+              </label>
+              <textarea
+                value={activePaper.abstract_text ?? ""}
+                onChange={(e) => handleChange("abstract_text", e.target.value)}
+                rows={4}
+                placeholder="Paste or edit the abstract…"
+                className="w-full bg-bg-tertiary text-body text-text-primary rounded px-2 py-1.5 outline-none border border-transparent focus:border-accent/40 transition-colors selectable resize-y max-h-48 leading-relaxed"
               />
             </div>
             {/* Keywords */}
