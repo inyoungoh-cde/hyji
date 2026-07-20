@@ -272,24 +272,17 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       });
       await textLayer.render();
 
-      // Inverted strategy: mark ALL spans as pdfjs-space by default,
-      // then un-mark only confirmed word spans (non-whitespace + scaleX <= 1.5).
-      // More robust than trying to detect only bad spans — space span
-      // properties vary considerably across PDFs.
-      let _marked = 0, _kept = 0;
+      // Selection-bleed mitigation, v3 (verified via scripted drag test):
+      // suppress ::selection ONLY on whitespace-only spans — their large
+      // scaleX transforms are what paint the full-line flash. Text-bearing
+      // spans always keep the visible selection highlight; the previous
+      // scaleX<=1.5 heuristic over-marked them and made normal drag
+      // selection invisible.
       textLayerDiv.querySelectorAll("span").forEach((span) => {
-        const text = span.textContent ?? "";
-        const m = span.style.transform.match(/scaleX\(([^)]+)\)/);
-        const scaleX = m ? parseFloat(m[1]) : 1;
-        if (text.trim().length > 0 && scaleX <= 1.5) {
-          _kept++; // leave normal selection highlight
-        } else {
+        if (!(span.textContent ?? "").trim()) {
           (span as HTMLElement).classList.add("pdfjs-space");
-          _marked++;
         }
       });
-      // eslint-disable-next-line no-console
-      console.log("[hyji] page" + pageNum + ": " + _kept + " word, " + _marked + " space spans");
       // Create endOfContent div — required for drag-to-select across spans.
       const endOfContent = document.createElement("div");
       endOfContent.className = "endOfContent";

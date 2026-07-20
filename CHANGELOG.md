@@ -2,6 +2,12 @@
 
 All notable changes to HYJI will be documented in this file.
 
+## [1.0.7] - 2026-07-20
+
+### Fixed
+
+- **Text-selection highlight visible again while dragging** — the previous whitespace-bleed mitigation (span marking by `scaleX` threshold) over-matched normal word spans, making drag selection nearly invisible in many PDFs. Selection suppression now applies only to whitespace-only spans: you see what you select, and the full-line flash from stretched space spans stays suppressed.
+
 ## [1.0.6] - 2026-07-20
 
 ### Added

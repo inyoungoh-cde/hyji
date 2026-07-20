@@ -163,6 +163,9 @@ Please keep PRs focused — one feature or fix per PR.
 
 ## Changelog
 
+### v1.0.7 (Jul 2026)
+- Drag-selection highlight is visible again (previous bleed mitigation over-suppressed it)
+
 ### v1.0.6 (Jul 2026)
 - Dark mode now counter-inverts figures/photos so they keep natural colors
 - Library search also matches your notes (Summary/Differentiation/Questions/Abstract)
