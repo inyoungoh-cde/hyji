@@ -11,6 +11,7 @@ import {
 import {
   loadStartupLayout,
   saveStartupLayout,
+  useUiStore,
   type StartupLayout,
 } from "../../stores/ui";
 import { useNetworkStore } from "../../stores/network";
@@ -19,6 +20,16 @@ const LAYOUT_OPTIONS: { value: StartupLayout; label: string; hint: string }[] = 
   { value: "remember", label: "Remember last layout", hint: "Panels reopen exactly as you left them" },
   { value: "full", label: "Full workspace", hint: "Sidebar + tracker always open on launch" },
   { value: "viewer", label: "Viewer only", hint: "Start with all panels closed — pure PDF reading (Ctrl+B / Ctrl+J to reopen)" },
+];
+
+// Stem-darkening strength for PDF text on standard-DPI (100%-scale) monitors.
+// pdf.js renders glyphs without hinting, so text can look thinner and lighter
+// than Acrobat; the darkening pass compensates. Taste varies — let users pick.
+const DARKENING_OPTIONS: { value: number; label: string; hint: string }[] = [
+  { value: 0, label: "Off", hint: "pdf.js default rendering — lightest strokes" },
+  { value: 0.35, label: "Subtle", hint: "A touch more weight, closest to the default look" },
+  { value: 0.65, label: "Standard", hint: "Acrobat-like stroke weight (recommended)" },
+  { value: 0.85, label: "Strong", hint: "Boldest — for low-contrast displays" },
 ];
 
 interface PreferencesDialogProps {
@@ -50,6 +61,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [startupLayout, setStartupLayout] = useState<StartupLayout>(loadStartupLayout);
   const offlineMode = useNetworkStore((s) => s.offlineMode);
   const setOfflineMode = useNetworkStore((s) => s.setOfflineMode);
+  const pdfTextDarkening = useUiStore((s) => s.pdfTextDarkening);
+  const setPdfTextDarkening = useUiStore((s) => s.setPdfTextDarkening);
 
   const handleLayoutChange = (layout: StartupLayout) => {
     setStartupLayout(layout);
@@ -141,6 +154,34 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                 </label>
               ))}
             </div>
+          </Section>
+
+          <Section label="PDF text rendering">
+            <div className="flex flex-col gap-2">
+              {DARKENING_OPTIONS.map((o) => (
+                <label
+                  key={o.value}
+                  className="flex items-start gap-2 text-body text-text-primary cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="pdf-text-darkening"
+                    checked={pdfTextDarkening === o.value}
+                    onChange={() => setPdfTextDarkening(o.value)}
+                    className="accent-[#58a6ff] mt-0.5"
+                  />
+                  <span>
+                    {o.label}
+                    <span className="block text-caption text-text-tertiary">{o.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-caption text-text-tertiary leading-relaxed">
+              Text stroke weight on standard-DPI monitors (100% display scale). Applies
+              immediately to the open PDF — try each option and pick what reads best.
+              High-DPI monitors (125%+ scale) are unaffected.
+            </p>
           </Section>
 
           <Section label="Network & privacy">

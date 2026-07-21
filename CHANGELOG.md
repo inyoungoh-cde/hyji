@@ -7,6 +7,12 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.3] - 2026-07-21
+
+### Added
+
+- **Adjustable text stroke weight** — Preferences gains a **PDF text rendering** section with four levels: Off / Subtle / Standard / Strong. The stem-darkening pass introduced in 2.2 used one fixed strength; how heavy text should look is a matter of taste (and of the specific monitor), so now you pick. Changes apply instantly to the open PDF — flip through the options and keep what reads best. Default is Standard (the 2.2 behavior); high-DPI monitors (125%+ scale) remain unaffected as before.
+
 ## [2.2] - 2026-07-21
 
 ### Improved

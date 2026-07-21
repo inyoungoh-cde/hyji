@@ -102,6 +102,9 @@ interface UiState {
   textSize: TextSize;
   /** Dark-mode PDF rendering (inverted canvas for night reading). */
   pdfDarkMode: boolean;
+  /** Stem-darkening strength for PDF text on standard-DPI displays (0 = off).
+   *  Compensates for pdf.js's unhinted antialiasing looking thin vs Acrobat. */
+  pdfTextDarkening: number;
   focusMode: boolean;
   preFocusState: PreFocusState | null;
 
@@ -121,6 +124,7 @@ interface UiState {
   closeSearchOverlay: () => void;
   setTextSize: (size: TextSize) => void;
   togglePdfDarkMode: () => void;
+  setPdfTextDarkening: (v: number) => void;
   enterFocusMode: (snapshot: PreFocusState) => void;
   exitFocusMode: () => PreFocusState | null;
 }
@@ -135,6 +139,17 @@ function loadNumber(key: string, fallback: number): number {
   } catch {
     return fallback;
   }
+}
+
+function loadPdfTextDarkening(): number {
+  try {
+    const v = localStorage.getItem("hyji:pdf-text-darkening");
+    if (v !== null) {
+      const n = Number(v);
+      if (!Number.isNaN(n) && n >= 0 && n <= 1) return n;
+    }
+  } catch { /* ignore */ }
+  return 0.65;
 }
 
 function loadTextSize(): TextSize {
@@ -161,6 +176,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   searchOverlayScope: null,
   textSize: loadTextSize(),
   pdfDarkMode: loadBool("hyji:pdf-dark", false),
+  pdfTextDarkening: loadPdfTextDarkening(),
   focusMode: false,
   preFocusState: null,
 
@@ -243,6 +259,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   setTextSize: (size) => {
     localStorage.setItem("hyji:text-size", size);
     set({ textSize: size });
+  },
+  setPdfTextDarkening: (v) => {
+    try { localStorage.setItem("hyji:pdf-text-darkening", String(v)); } catch { /* ignore */ }
+    set({ pdfTextDarkening: v });
   },
   togglePdfDarkMode: () =>
     set((s) => {

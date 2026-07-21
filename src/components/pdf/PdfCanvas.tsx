@@ -146,6 +146,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
 }: PdfCanvasProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfDarkMode = useUiStore((s) => s.pdfDarkMode);
+  const textDarkening = useUiStore((s) => s.pdfTextDarkening);
   // Which file the currently laid-out pages belong to. Scroll events are only
   // recorded for that file — during a tab switch the collapsing old layout
   // fires a clamped scroll-to-0 that must not overwrite the new file's memory.
@@ -266,9 +267,10 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const renderPage = useCallback(
     async (pageNum: number) => {
       if (!doc) return;
-      // Skip if already rendered at this scale AND pixel ratio — a dpr
-      // change alone (monitor move) must invalidate the cached bitmap.
-      const renderKey = `${scale}@${window.devicePixelRatio || 1}`;
+      // Skip if already rendered with these exact parameters — a dpr change
+      // alone (monitor move) or a darkening-preference change must
+      // invalidate the cached bitmap.
+      const renderKey = `${scale}@${window.devicePixelRatio || 1}@${textDarkening}`;
       if (renderedPages.current.get(pageNum) === renderKey) return;
       renderedPages.current.set(pageNum, renderKey);
 
@@ -313,7 +315,8 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       // Acrobat, which darkens stems. Multiplying the page with itself squares
       // the midtones — antialiased glyph edges get pulled darker while white
       // paper stays white. Photos/figures are clipped out to keep their tones.
-      if (dpr < 1.5) {
+      // Strength is a preference (0 = off); high-DPI displays don't need it.
+      if (dpr < 1.5 && textDarkening > 0) {
         ctx.save();
         if (imageRegions.length > 0) {
           ctx.beginPath();
@@ -324,7 +327,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
           ctx.clip("evenodd");
         }
         ctx.globalCompositeOperation = "multiply";
-        ctx.globalAlpha = 0.65;
+        ctx.globalAlpha = textDarkening;
         ctx.drawImage(canvas, 0, 0);
         ctx.restore();
       }
@@ -513,7 +516,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         document.removeEventListener("mouseup", onMouseUp);
       };
     },
-    [doc, scale]
+    [doc, scale, textDarkening]
   );
 
   // Expose methods for print
@@ -584,7 +587,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   useEffect(() => {
     renderedPages.current.clear();
     pages.forEach((p) => renderPage(p.pageNum));
-  }, [scale, dpr, pages, renderPage]);
+  }, [scale, dpr, textDarkening, pages, renderPage]);
 
   // Restore the last reading position when this document (re)loads,
   // e.g. after switching back to its tab. Only after this runs do scroll
