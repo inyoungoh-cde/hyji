@@ -176,6 +176,9 @@ Please keep PRs focused — one feature or fix per PR.
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
 
+### v2.2 (Jul 2026)
+- Text on standard-DPI monitors (100% scale, e.g. FHD portrait displays) now renders with Acrobat-like stem darkening — darker strokes, higher edge contrast; photos/figures are exempted so colors stay true
+
 ### v2.1 (Jul 2026)
 - Fixed blurry PDF after moving the window between monitors with different display scales (e.g. 125% main → 100% portrait monitor) — the pixel-ratio change is now detected reliably (three redundant signals, settled re-reads) and every page re-renders at the new ratio
 - Focus Mode re-fits and re-renders on window resize or monitor move, so pages stay sharp

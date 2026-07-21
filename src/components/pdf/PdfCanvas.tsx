@@ -288,28 +288,55 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       // Canvas
       const canvas = document.createElement("canvas");
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(viewport.width * dpr);
-      canvas.height = Math.floor(viewport.height * dpr);
+      const renderViewport = page.getViewport({ scale: scale * dpr });
+      canvas.width = Math.floor(renderViewport.width);
+      canvas.height = Math.floor(renderViewport.height);
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
       canvas.style.display = "block";
       container.appendChild(canvas);
 
       const ctx = canvas.getContext("2d")!;
-      ctx.scale(dpr, dpr);
-      await page.render({ canvasContext: ctx, viewport } as any).promise;
+      await page.render({ canvasContext: ctx, viewport: renderViewport } as any).promise;
+
+      // Bitmap-figure regions (viewport/CSS space) — used twice below: to
+      // exempt photos from stem darkening, and for dark-mode counter-invert.
+      let imageRegions: Array<{ x: number; y: number; w: number; h: number }> = [];
+      try {
+        const opList = await page.getOperatorList();
+        imageRegions = computeImageRegions(opList, viewport);
+      } catch { /* best-effort */ }
+
+      // Stem darkening: pdf.js draws glyphs with plain grayscale antialiasing
+      // and no hinting, so on low-DPI displays (devicePixelRatio 1, e.g. an
+      // FHD monitor at 100% scale) text reads thin and washed-out next to
+      // Acrobat, which darkens stems. Multiplying the page with itself squares
+      // the midtones — antialiased glyph edges get pulled darker while white
+      // paper stays white. Photos/figures are clipped out to keep their tones.
+      if (dpr < 1.5) {
+        ctx.save();
+        if (imageRegions.length > 0) {
+          ctx.beginPath();
+          ctx.rect(0, 0, canvas.width, canvas.height);
+          for (const r of imageRegions) {
+            ctx.rect(r.x * dpr, r.y * dpr, r.w * dpr, r.h * dpr);
+          }
+          ctx.clip("evenodd");
+        }
+        ctx.globalCompositeOperation = "multiply";
+        ctx.globalAlpha = 0.65;
+        ctx.drawImage(canvas, 0, 0);
+        ctx.restore();
+      }
 
       // Dark-mode: counter-invert overlays over bitmap images so photos and
       // figures keep natural colors (CSS shows them only in .hyji-pdf-dark).
-      try {
-        const opList = await page.getOperatorList();
-        for (const r of computeImageRegions(opList, viewport)) {
-          const div = document.createElement("div");
-          div.className = "hyji-img-region";
-          div.style.cssText = `position:absolute;left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;pointer-events:none;`;
-          container.appendChild(div);
-        }
-      } catch { /* best-effort — worst case images stay inverted */ }
+      for (const r of imageRegions) {
+        const div = document.createElement("div");
+        div.className = "hyji-img-region";
+        div.style.cssText = `position:absolute;left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;pointer-events:none;`;
+        container.appendChild(div);
+      }
 
       // Text layer — use pdfjs TextLayer class for accurate span sizing and positioning
       const textLayerDiv = document.createElement("div");

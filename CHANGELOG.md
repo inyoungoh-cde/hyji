@@ -7,6 +7,12 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.2] - 2026-07-21
+
+### Improved
+
+- **Darker, Acrobat-like text on standard-DPI monitors** — pdf.js draws glyphs with plain grayscale antialiasing and no hinting, so on a 100%-scale monitor (e.g. an FHD portrait display) text rendered noticeably thinner and lighter than Adobe Acrobat's stem-darkened output. HYJI now applies a stem-darkening pass on such displays (the page is multiplied with itself, squaring the midtones): antialiased glyph edges get pulled darker and edge contrast increases, while white paper stays white. Photos and figures are automatically clipped out of the pass (using the same bitmap-region detection as dark mode) so their colors are untouched. High-DPI displays (≥150% scale) don't need it and are skipped. Tuned side-by-side against Acrobat on a 1080×1920 portrait monitor.
+
 ## [2.1] - 2026-07-20
 
 ### Fixed
