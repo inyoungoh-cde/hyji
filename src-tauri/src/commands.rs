@@ -169,13 +169,38 @@ pub async fn http_get_text(url: String, mailto: Option<String>) -> Result<String
         .build()
         .map_err(|e| format!("HTTP client: {e}"))?;
 
+    // Walk the source chain so "error sending request" carries its actual
+    // cause (dns error / connect timeout / ...) into the user-facing dialog.
+    fn err_chain(e: &dyn std::error::Error) -> String {
+        let mut s = e.to_string();
+        let mut src = e.source();
+        while let Some(inner) = src {
+            s.push_str(" — ");
+            s.push_str(&inner.to_string());
+            src = inner.source();
+        }
+        s
+    }
+
     const MAX_ATTEMPTS: u32 = 3;
     for attempt in 1..=MAX_ATTEMPTS {
-        let resp = client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| format!("Request failed: {e}"))?;
+        // Connection-level failures (DNS hiccup, transient network drop) are
+        // retried just like 429/503 — they are usually gone a second later.
+        let resp = match client.get(&url).send().await {
+            Ok(r) => r,
+            Err(e) if attempt < MAX_ATTEMPTS => {
+                tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                let _ = e;
+                continue;
+            }
+            Err(e) => {
+                return Err(format!(
+                    "Request failed after {MAX_ATTEMPTS} attempts: {}. \
+                     Check the network connection and try again.",
+                    err_chain(&e)
+                ))
+            }
+        };
 
         let status = resp.status().as_u16();
         if (status == 429 || status == 503) && attempt < MAX_ATTEMPTS {

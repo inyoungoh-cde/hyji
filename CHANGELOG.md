@@ -7,6 +7,21 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.5] - 2026-07-21
+
+### Fixed
+
+- **"Request failed: error sending request" on Fetch metadata** — a momentary network/DNS drop failed the lookup instantly: the 2.4 retry only covered HTTP 429/503 responses, not connection-level failures. Those now retry too (up to 3 attempts, 1.5 s apart), and if all attempts fail the error dialog shows the underlying cause (DNS, timeout, …) instead of a bare "error sending request".
+- **Dialogs taller than the window now scroll** — the shared modal (Preferences, Export, Import, Smart Paste, shortcuts) is capped to the viewport height with a pinned header and a scrollable body; previously a tall dialog (e.g. Preferences after the new sections) was simply cut off with no way to reach the bottom. The first-lookup notice got the same safety cap.
+
+### Added
+
+- **Windows system proxy support** for metadata lookups — requests now honor the proxy configured in Windows settings (previously only direct connections worked).
+
+### Note
+
+- The one-time "before the first online lookup" notice is per user profile, not per install — it does not reappear after reinstalling because consent is remembered in app data. Reset to Blank (Tools) clears it along with everything else.
+
 ## [2.4] - 2026-07-21
 
 ### Fixed

@@ -106,7 +106,7 @@ export function FetchMetadataButton({ paper }: { paper: Paper }) {
           onMouseDown={() => setShowConsent(false)}
         >
           <div
-            className="w-[480px] max-w-[92vw] bg-bg-secondary border border-border rounded-[12px] shadow-2xl"
+            className="w-[480px] max-w-[92vw] max-h-[85vh] overflow-y-auto hyji-pdf-scroll bg-bg-secondary border border-border rounded-[12px] shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="px-5 pt-4 pb-2">

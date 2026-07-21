@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/schemas/master/tauri/v2/tauri.conf.schema.json",
   "productName": "HYJI",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "identifier": "com.hyji.app",
   "build": {
     "frontendDist": "../dist",
