@@ -121,6 +121,8 @@ export function FetchMetadataButton({ paper }: { paper: Paper }) {
                 <span className="font-mono text-small">api.crossref.org</span> or{" "}
                 <span className="font-mono text-small">export.arxiv.org</span> (both
                 non-profit scholarly services) and read back the public metadata.
+                (If you set an optional polite-pool email in Preferences, it is included
+                in the request signature.)
               </p>
               <p>
                 Your PDFs, notes, highlights, and library never leave this computer.

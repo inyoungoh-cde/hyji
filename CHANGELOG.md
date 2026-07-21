@@ -7,6 +7,16 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.4] - 2026-07-21
+
+### Fixed
+
+- **"Fetch metadata" failing with HTTP 429** — Crossref serves requests without a contact address from a shared *anonymous pool* that is intermittently rate-limited; since the v2.0 privacy cleanup removed the developer email from the request signature, lookups landed in that pool and could get 429 on the very first click. Three-part fix:
+  - Transient 429/503 responses are now retried automatically (up to 3 attempts, honoring the server's `Retry-After`).
+  - If Crossref still fails, HYJI scans the PDF for an arXiv ID and falls back to the arXiv API — previously the fallback was skipped whenever the DOI field was already filled.
+  - Preferences → Network & privacy gains an **optional polite-pool email**: if you enter a contact address, it is appended to the request signature and Crossref serves you from a dedicated, generously-limited "polite pool". Strictly opt-in — leave it empty to stay anonymous (the default; nothing extra is sent). The first-lookup notice mentions this.
+- The lookup `User-Agent` now reports the real app version automatically (was a hardcoded "2.x").
+
 ## [2.3] - 2026-07-21
 
 ### Added

@@ -63,6 +63,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const setOfflineMode = useNetworkStore((s) => s.setOfflineMode);
   const pdfTextDarkening = useUiStore((s) => s.pdfTextDarkening);
   const setPdfTextDarkening = useUiStore((s) => s.setPdfTextDarkening);
+  const politeEmail = useNetworkStore((s) => s.politeEmail);
+  const setPoliteEmail = useNetworkStore((s) => s.setPoliteEmail);
 
   const handleLayoutChange = (layout: StartupLayout) => {
     setStartupLayout(layout);
@@ -206,6 +208,25 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               <span className="font-mono">export.arxiv.org</span> (both non-profit).
               Your PDFs, notes, and library never leave this computer.
             </p>
+
+            <div className="mt-3">
+              <Label>Polite-pool email (optional)</Label>
+              <input
+                type="email"
+                value={politeEmail}
+                onChange={(e) => setPoliteEmail(e.target.value)}
+                placeholder="you@university.edu"
+                disabled={offlineMode}
+                className="w-full bg-bg-tertiary text-body text-text-primary rounded px-2 py-1.5 outline-none border border-transparent focus:border-accent/40 transition-colors selectable disabled:opacity-40"
+              />
+              <p className="mt-1 text-caption text-text-tertiary leading-relaxed">
+                Crossref's shared anonymous pool is sometimes rate-limited (HTTP 429).
+                Adding a contact email routes your lookups to their "polite pool" with a
+                dedicated, faster lane. If set, the email is included in the request
+                signature sent to <span className="font-mono">api.crossref.org</span> —
+                leave empty to stay anonymous.
+              </p>
+            </div>
           </Section>
 
           <Section label="Auto-backup">

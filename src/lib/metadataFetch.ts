@@ -13,6 +13,13 @@ function assertOnlineAllowed(): void {
   }
 }
 
+/** Optional polite-pool contact (v2.4) — appended to the User-Agent in Rust.
+ *  Empty string → anonymous pool (nothing extra is sent). */
+function politeMailto(): string | null {
+  const v = useNetworkStore.getState().politeEmail.trim();
+  return v || null;
+}
+
 /**
  * Online metadata lookup (v1.0.5). Zotero-style "retrieve metadata":
  * extract a DOI / arXiv id from the PDF's first pages, then query
@@ -95,6 +102,7 @@ export async function fetchFromCrossref(doi: string): Promise<FetchedMetadata> {
   assertOnlineAllowed();
   const body = await invoke<string>("http_get_text", {
     url: `https://api.crossref.org/works/${encodeURIComponent(doi)}`,
+    mailto: politeMailto(),
   });
   const m = JSON.parse(body).message;
 
@@ -127,6 +135,7 @@ export async function fetchFromArxiv(arxivId: string): Promise<FetchedMetadata> 
   assertOnlineAllowed();
   const body = await invoke<string>("http_get_text", {
     url: `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxivId)}&max_results=1`,
+    mailto: politeMailto(),
   });
   const xml = new DOMParser().parseFromString(body, "text/xml");
   const entry = xml.querySelector("entry");
@@ -184,6 +193,14 @@ export async function fetchMetadataForPaper(paper: Paper): Promise<FetchedMetada
     try {
       return await fetchFromCrossref(doi);
     } catch (e) {
+      // Crossref down or rate-limiting (HTTP 429 on the anonymous pool) —
+      // scan the PDF for an arXiv id we may have skipped because the DOI
+      // field was already filled, and fall back to the arXiv API.
+      if (!arxivId && paper.pdf_path) {
+        try {
+          arxivId = (await extractIdentifiersFromPdf(paper.pdf_path)).arxivId;
+        } catch { /* scan is best-effort */ }
+      }
       if (!arxivId) throw new Error(`Crossref lookup failed for ${doi}: ${String(e)}`);
     }
   }

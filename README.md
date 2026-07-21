@@ -176,6 +176,9 @@ Please keep PRs focused — one feature or fix per PR.
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
 
+### v2.4 (Jul 2026)
+- Fixed HTTP 429 on "Fetch metadata": automatic retry with backoff, arXiv fallback when Crossref is throttled, and an optional (opt-in) polite-pool email in Preferences for a dedicated Crossref rate limit
+
 ### v2.3 (Jul 2026)
 - Text stroke weight on standard-DPI monitors is now adjustable in Preferences (Off / Subtle / Standard / Strong) — applies live to the open PDF
 

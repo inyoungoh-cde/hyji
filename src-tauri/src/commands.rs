@@ -134,8 +134,13 @@ pub async fn delete_paper(id: String) -> Result<(), String> {
 /// Fetch text from an allowlisted metadata API. Runs in Rust because the
 /// WebView enforces CORS (arXiv's API sends no CORS headers) and because a
 /// proper User-Agent (Crossref "polite pool") must be attached.
+///
+/// `mailto` is the user's optional polite-pool contact (v2.4): with it,
+/// Crossref serves from a per-contact pool with generous limits; without it,
+/// requests share the anonymous pool, which intermittently answers HTTP 429.
+/// Transient 429/503 responses are retried honoring Retry-After.
 #[tauri::command]
-pub async fn http_get_text(url: String) -> Result<String, String> {
+pub async fn http_get_text(url: String, mailto: Option<String>) -> Result<String, String> {
     const ALLOWED_PREFIXES: [&str; 2] = [
         "https://api.crossref.org/",
         "https://export.arxiv.org/",
@@ -144,20 +149,58 @@ pub async fn http_get_text(url: String) -> Result<String, String> {
         return Err(format!("URL not allowed: {url}"));
     }
 
+    let mut ua = format!(
+        "HYJI/{} (+https://github.com/inyoungoh-cde/hyji",
+        env!("CARGO_PKG_VERSION")
+    );
+    if let Some(m) = mailto
+        .as_deref()
+        .map(str::trim)
+        .filter(|m| !m.is_empty() && m.contains('@') && m.len() <= 100 && m.is_ascii())
+    {
+        ua.push_str("; mailto:");
+        ua.push_str(m);
+    }
+    ua.push(')');
+
     let client = reqwest::Client::builder()
-        .user_agent("HYJI/2.x (+https://github.com/inyoungoh-cde/hyji)")
+        .user_agent(ua)
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| format!("HTTP client: {e}"))?;
 
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
+    const MAX_ATTEMPTS: u32 = 3;
+    for attempt in 1..=MAX_ATTEMPTS {
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {e}"))?;
 
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status().as_u16()));
+        let status = resp.status().as_u16();
+        if (status == 429 || status == 503) && attempt < MAX_ATTEMPTS {
+            let wait = resp
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.trim().parse::<u64>().ok())
+                .unwrap_or(2)
+                .clamp(1, 5);
+            tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+            continue;
+        }
+        if status == 429 {
+            return Err(
+                "HTTP 429 — the metadata service is rate-limiting anonymous requests right now. \
+                 Try again in a minute, or set a polite-pool email in Tools → Preferences… → \
+                 Network & privacy for a dedicated, faster lane."
+                    .to_string(),
+            );
+        }
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {status}"));
+        }
+        return resp.text().await.map_err(|e| format!("Read body: {e}"));
     }
-    resp.text().await.map_err(|e| format!("Read body: {e}"))
+    unreachable!("retry loop always returns")
 }
