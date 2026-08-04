@@ -7,6 +7,21 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.6] - 2026-08-04
+
+### Fixed
+
+- **Papers got slower to open the longer HYJI ran — sometimes never finishing** — every tab open/switch/close left the parsed PDF (fonts, page structures, the whole file buffer) behind in pdf.js's worker memory. With a 60+ paper library the worker heap eventually filled up and new documents could hang forever. Documents are now released on every tab switch and close; the metadata- and keyword-scanning paths had the same leak (one document per scanned PDF) and were fixed too.
+- **Opening a paper rendered the entire document up front** — every page (canvas + text layer + link layer, plus a second full decode per page for figure detection) was built immediately on open. Now only the pages around the viewport render, with one page of look-ahead as you scroll, and on long documents (40+ pages) far-off pages are released while reading so canvas memory stays bounded.
+- **Figure detection now runs only when needed** — the extra per-page decode that locates bitmap figures (for dark-mode counter-invert and stem-darkening clipping) is skipped when PDF dark mode is off and stem darkening is inactive, roughly halving page render work in the default light-mode setup on high-DPI monitors.
+- **Launch no longer re-reads keyword-less PDFs** — papers whose keyword auto-extraction had found nothing were re-read in full on every single launch; the "nothing found" result is now remembered per paper.
+- A page whose first render was interrupted (e.g. by an immediate tab switch) could previously be skipped forever; renders now retry cleanly.
+
+### Changed
+
+- Full-text search indexing and keyword/metadata extraction moved to a **dedicated background PDF worker** — a first-run library index used to share the viewer's worker, so every page you tried to open queued behind the indexing of the whole library.
+- A "Loading PDF…" indicator is shown while a document loads (previously just a blank gray area).
+
 ## [2.5] - 2026-07-21
 
 ### Fixed

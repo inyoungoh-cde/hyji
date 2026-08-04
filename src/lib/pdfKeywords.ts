@@ -1,6 +1,7 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
+import { getBgPdfWorker } from "./pdfBgWorker";
 import { parseKeywordString } from "./keywordExtract";
 
 try {
@@ -53,38 +54,46 @@ export async function extractKeywordsFromPdf(pdfPath: string): Promise<string[]>
       }
     } catch { /* ignore */ }
 
-    // Pass a copy to pdfjs so the original bytes stay intact if needed later
-    const doc = await pdfjsLib.getDocument({ data: bytes.slice(), ...PDFJS_ASSET_OPTIONS }).promise;
+    // Pass a copy to pdfjs so the original bytes stay intact if needed later.
+    // Runs on the shared background worker so it never queues viewer renders.
+    const doc = await pdfjsLib.getDocument({
+      data: bytes.slice(),
+      worker: getBgPdfWorker(),
+      ...PDFJS_ASSET_OPTIONS,
+    }).promise;
+    try {
+      // 1a. PDF info-dict Keywords field (most common format)
+      const meta = await doc.getMetadata();
+      const metaKw = (meta.info as Record<string, string>)?.Keywords ?? "";
+      if (metaKw.trim()) {
+        const parsed = parseKeywordString(metaKw);
+        if (parsed.length > 0) return parsed;
+      }
 
-    // 1a. PDF info-dict Keywords field (most common format)
-    const meta = await doc.getMetadata();
-    const metaKw = (meta.info as Record<string, string>)?.Keywords ?? "";
-    if (metaKw.trim()) {
-      const parsed = parseKeywordString(metaKw);
-      if (parsed.length > 0) return parsed;
+      // 2. First-page text — look for "Keywords:" section
+      const page = await doc.getPage(1);
+      const textContent = await page.getTextContent();
+      const text = textContent.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ")
+        .replace(/\s+/g, " ");
+
+      // Capture up to 350 chars after "Keywords:", stop at known section headers
+      const kwMatch = text.match(
+        /[Kk]ey\s*[Ww]ords?\s*[:\-—]\s*(.{5,350}?)(?=\s*(?:Nomenclature|Introduction|Abstract|CCS|ACM|Index Terms?|©|\d\s*\.|Received|Accepted|Corresponding)|\.\s+[A-Z]|$)/
+      );
+      if (kwMatch) {
+        const parsed = parseKeywordString(kwMatch[1]);
+        // Sanity check: reject batches that look like garbled concatenations.
+        // pdfjs sometimes drops word-spacing for certain PDFs, producing tokens like
+        // "spondenceunderstanding" or "turefinetuning" — clearly word fragments.
+        if (parsed.length > 0 && !looksGarbled(parsed)) return parsed;
+      }
+
+      return [];
+    } finally {
+      await doc.destroy().catch(() => undefined);
     }
-
-    // 2. First-page text — look for "Keywords:" section
-    const page = await doc.getPage(1);
-    const textContent = await page.getTextContent();
-    const text = textContent.items
-      .map((item) => ("str" in item ? item.str : ""))
-      .join(" ")
-      .replace(/\s+/g, " ");
-
-    // Capture up to 350 chars after "Keywords:", stop at known section headers
-    const kwMatch = text.match(
-      /[Kk]ey\s*[Ww]ords?\s*[:\-—]\s*(.{5,350}?)(?=\s*(?:Nomenclature|Introduction|Abstract|CCS|ACM|Index Terms?|©|\d\s*\.|Received|Accepted|Corresponding)|\.\s+[A-Z]|$)/
-    );
-    if (kwMatch) {
-      const parsed = parseKeywordString(kwMatch[1]);
-      // Sanity check: reject batches that look like garbled concatenations.
-      // pdfjs sometimes drops word-spacing for certain PDFs, producing tokens like
-      // "spondenceunderstanding" or "turefinetuning" — clearly word fragments.
-      if (parsed.length > 0 && !looksGarbled(parsed)) return parsed;
-    }
-
-    return [];
   } catch {
     return [];
   }

@@ -176,6 +176,9 @@ Please keep PRs focused — one feature or fix per PR.
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
 
+### v2.6 (Aug 2026)
+- Fixed papers becoming slower to open the longer the app ran — and sometimes never loading at all: PDFs are now released from worker memory on tab switch/close, only the pages near the viewport are rendered (bounded canvas memory on long documents), and library indexing runs on its own background worker so it never blocks opening a paper
+
 ### v2.5 (Jul 2026)
 - Metadata lookup retries transient connection failures (not just HTTP 429/503) and reports the real cause on failure; Windows system proxy is honored
 - Dialogs taller than the window (e.g. Preferences) now scroll instead of being cut off

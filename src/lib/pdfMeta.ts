@@ -1,6 +1,7 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
+import { getBgPdfWorker } from "./pdfBgWorker";
 
 try {
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -14,9 +15,14 @@ export interface PdfMetaResult {
 }
 
 export async function extractPdfMeta(pdfPath: string): Promise<PdfMetaResult> {
+  let doc: pdfjsLib.PDFDocumentProxy | null = null;
   try {
     const bytes = await readFile(pdfPath);
-    const doc = await pdfjsLib.getDocument({ data: bytes, ...PDFJS_ASSET_OPTIONS }).promise;
+    doc = await pdfjsLib.getDocument({
+      data: bytes,
+      worker: getBgPdfWorker(),
+      ...PDFJS_ASSET_OPTIONS,
+    }).promise;
 
     // 1. PDF metadata Title field
     const meta = await doc.getMetadata();
@@ -80,6 +86,8 @@ export async function extractPdfMeta(pdfPath: string): Promise<PdfMetaResult> {
     return { title };
   } catch {
     return { title: "" };
+  } finally {
+    await doc?.destroy().catch(() => undefined);
   }
 }
 

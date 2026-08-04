@@ -155,6 +155,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const [pages, setPages] = useState<PageEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const renderedPages = useRef<Map<number, string>>(new Map()); // pageNum -> "scale@dpr" render key
+  const visiblePagesRef = useRef<Set<number>>(new Set());       // pages currently intersecting the viewport
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());       // outer page wrapper (for observer, scroll, text queries)
   const renderRefs = useRef<Map<number, HTMLDivElement>>(new Map());     // inner div (for imperative canvas/textLayer rendering)
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -219,8 +220,14 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   // Load document
   useEffect(() => {
     let cancelled = false;
+    // The document owned by THIS effect run. It must be destroyed on cleanup
+    // (tab switch/close) — otherwise every open leaks the whole parsed
+    // document (fonts, page trees, the file buffer) in the pdf.js worker,
+    // and after enough opens the worker heap fills up and loads hang forever.
+    let ownedDoc: PDFDocumentProxy | null = null;
     loadedFileRef.current = null;
     renderedPages.current.clear();
+    visiblePagesRef.current.clear();
     setPages([]);
     setDoc(null);
     setError(null);
@@ -235,21 +242,25 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
           data: bytes,
           ...PDFJS_ASSET_OPTIONS,
         }).promise;
-        if (cancelled) return;
+        if (cancelled) {
+          pdfDoc.destroy().catch(() => undefined);
+          return;
+        }
+        ownedDoc = pdfDoc;
 
         setDoc(pdfDoc);
         onDocLoaded(pdfDoc);
 
-        const pageEntries: PageEntry[] = [];
-        for (let i = 1; i <= pdfDoc.numPages; i++) {
-          const page = await pdfDoc.getPage(i);
-          const vp = page.getViewport({ scale: 1 });
-          pageEntries.push({
-            pageNum: i,
-            width: vp.width,
-            height: vp.height,
-          });
-        }
+        // Page dimensions in parallel — sequential awaits add a worker
+        // round-trip per page, noticeable on long documents.
+        const pageEntries: PageEntry[] = await Promise.all(
+          Array.from({ length: pdfDoc.numPages }, (_, i) =>
+            pdfDoc.getPage(i + 1).then((page) => {
+              const vp = page.getViewport({ scale: 1 });
+              return { pageNum: i + 1, width: vp.width, height: vp.height };
+            })
+          )
+        );
         if (!cancelled) {
           setPages(pageEntries);
           if (pageEntries[0]) onPageWidth?.(pageEntries[0].width);
@@ -260,7 +271,10 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      ownedDoc?.destroy().catch(() => undefined);
+    };
   }, [filePath, onDocLoaded]);
 
   // Render a single page
@@ -268,22 +282,19 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     async (pageNum: number) => {
       if (!doc) return;
       // Skip if already rendered with these exact parameters — a dpr change
-      // alone (monitor move) or a darkening-preference change must
-      // invalidate the cached bitmap.
-      const renderKey = `${scale}@${window.devicePixelRatio || 1}@${textDarkening}`;
+      // alone (monitor move), a darkening-preference change or a dark-mode
+      // toggle must invalidate the cached bitmap.
+      const renderKey = `${scale}@${window.devicePixelRatio || 1}@${textDarkening}@${pdfDarkMode ? "d" : "l"}`;
       if (renderedPages.current.get(pageNum) === renderKey) return;
-      renderedPages.current.set(pageNum, renderKey);
 
       const container = renderRefs.current.get(pageNum);
       if (!container) return;
+      renderedPages.current.set(pageNum, renderKey);
 
+      try {
       const page = await doc.getPage(pageNum);
       const viewport = page.getViewport({ scale });
 
-      // Cleanup previous document-level listeners before clearing
-      if ((container as any).__cleanupTextLayer) {
-        (container as any).__cleanupTextLayer();
-      }
       // Clear previous
       container.innerHTML = "";
 
@@ -303,11 +314,17 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
 
       // Bitmap-figure regions (viewport/CSS space) — used twice below: to
       // exempt photos from stem darkening, and for dark-mode counter-invert.
+      // getOperatorList() forces a second full decode of the page (images
+      // included), so only pay for it when a consumer is actually active;
+      // toggling dark mode re-renders (it is part of the render key above).
+      const needImageRegions = pdfDarkMode || (dpr < 1.5 && textDarkening > 0);
       let imageRegions: Array<{ x: number; y: number; w: number; h: number }> = [];
-      try {
-        const opList = await page.getOperatorList();
-        imageRegions = computeImageRegions(opList, viewport);
-      } catch { /* best-effort */ }
+      if (needImageRegions) {
+        try {
+          const opList = await page.getOperatorList();
+          imageRegions = computeImageRegions(opList, viewport);
+        } catch { /* best-effort */ }
+      }
 
       // Stem darkening: pdf.js draws glyphs with plain grayscale antialiasing
       // and no hinting, so on low-DPI displays (devicePixelRatio 1, e.g. an
@@ -377,15 +394,13 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       endOfContent.className = "endOfContent";
       textLayerDiv.appendChild(endOfContent);
 
-      // Toggle .selecting class on the textLayer during drag
-      const onMouseDown = () => {
+      // Toggle .selecting class on the textLayer during drag. The matching
+      // "remove on mouseup" lives in ONE component-level listener (below in a
+      // useEffect) — a per-page document listener here leaked the whole text
+      // layer of every page ever rendered after the tab closed.
+      textLayerDiv.addEventListener("mousedown", () => {
         textLayerDiv.classList.add("selecting");
-      };
-      const onMouseUp = () => {
-        textLayerDiv.classList.remove("selecting");
-      };
-      textLayerDiv.addEventListener("mousedown", onMouseDown);
-      document.addEventListener("mouseup", onMouseUp);
+      });
 
       // Annotation layer — renders clickable links (URLs + internal refs)
       const annotationLayerDiv = document.createElement("div");
@@ -511,13 +526,27 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         // Cache: pageNum -> sorted text items
         // TODO: reference tooltip preview (deferred)
       })();
-
-      (container as any).__cleanupTextLayer = () => {
-        document.removeEventListener("mouseup", onMouseUp);
-      };
+      } catch (err) {
+        // Render failed (e.g. the document was destroyed mid-flight during a
+        // tab switch) — forget the render key so a later pass can retry.
+        renderedPages.current.delete(pageNum);
+        console.warn(`Render failed for page ${pageNum}:`, err);
+      }
     },
-    [doc, scale, textDarkening]
+    [doc, scale, textDarkening, pdfDarkMode]
   );
+
+  // Single component-level "drag ended" listener for all text layers —
+  // pairs with the per-layer mousedown registered inside renderPage.
+  useEffect(() => {
+    const onMouseUp = () => {
+      containerRef.current
+        ?.querySelectorAll(".textLayer.selecting")
+        .forEach((el) => el.classList.remove("selecting"));
+    };
+    document.addEventListener("mouseup", onMouseUp);
+    return () => document.removeEventListener("mouseup", onMouseUp);
+  }, []);
 
   // Expose methods for print
   useImperativeHandle(ref, () => ({
@@ -581,12 +610,24 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     },
   }), [pages, doc, renderPage, annotations]);
 
-  // Re-render when scale or devicePixelRatio changes — the text layer and
-  // highlight overlay are rebuilt inside renderPage (container is cleared),
-  // so they always match the fresh canvas size.
+  // Re-render when scale / devicePixelRatio / rendering prefs change — the
+  // text layer and highlight overlay are rebuilt inside renderPage (container
+  // is cleared), so they always match the fresh canvas size.
+  //
+  // Only the pages near the viewport are rendered here. Rendering the WHOLE
+  // document (the previous behavior) allocated a full-resolution canvas, text
+  // layer and annotation layer for every page up front — on long or
+  // image-heavy PDFs that meant seconds of load time and hundreds of MB of
+  // canvas memory per open document. Off-screen pages are picked up lazily by
+  // the IntersectionObserver as the user scrolls.
   useEffect(() => {
     renderedPages.current.clear();
-    pages.forEach((p) => renderPage(p.pageNum));
+    const visible = visiblePagesRef.current;
+    for (const p of pages) {
+      if (visible.has(p.pageNum) || visible.has(p.pageNum - 1) || visible.has(p.pageNum + 1)) {
+        renderPage(p.pageNum);
+      }
+    }
   }, [scale, dpr, textDarkening, pages, renderPage]);
 
   // Restore the last reading position when this document (re)loads,
@@ -613,10 +654,38 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
             10
           );
           if (entry.isIntersecting) {
+            visiblePagesRef.current.add(pageNum);
             renderPage(pageNum);
+            // Pre-render one page ahead/behind so scrolling never waits.
+            renderPage(pageNum + 1);
+            renderPage(pageNum - 1);
+          } else {
+            visiblePagesRef.current.delete(pageNum);
           }
           if (entry.isIntersecting && entry.intersectionRatio > 0.3) {
             onPageChange(pageNum);
+          }
+        }
+
+        // Long documents: drop rendered pages far outside the viewport so
+        // canvas memory stays bounded while reading (each rendered page holds
+        // a multi-MB bitmap). Short documents are left alone.
+        const visible = visiblePagesRef.current;
+        if (pages.length > 40 && visible.size > 0) {
+          const nums = [...visible];
+          const lo = Math.min(...nums) - 12;
+          const hi = Math.max(...nums) + 12;
+          for (const pn of [...renderedPages.current.keys()]) {
+            if (pn >= lo && pn <= hi) continue;
+            const el = renderRefs.current.get(pn);
+            if (el) {
+              el.querySelectorAll("canvas").forEach((cv) => {
+                cv.width = 0;
+                cv.height = 0;
+              });
+              el.innerHTML = "";
+            }
+            renderedPages.current.delete(pn);
           }
         }
       },
@@ -626,6 +695,20 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     pageRefs.current.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, [pages, renderPage, onPageChange]);
+
+  // On unmount, explicitly release canvas bitmaps — detached canvases can
+  // keep their GPU memory alive until a much later GC pass.
+  useEffect(() => {
+    const renders = renderRefs.current;
+    return () => {
+      renders.forEach((el) => {
+        el.querySelectorAll("canvas").forEach((cv) => {
+          cv.width = 0;
+          cv.height = 0;
+        });
+      });
+    };
+  }, []);
 
   // Go to page
   useEffect(() => {
@@ -818,6 +901,13 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       }}
     >
         <div className="flex flex-col items-center gap-3 py-4 hyji-pdf-pages">
+          {pages.length === 0 && (
+            <div className="flex items-center justify-center py-24">
+              <div className="text-body text-white/50 animate-pulse select-none">
+                Loading PDF…
+              </div>
+            </div>
+          )}
           {pages.map((p) => (
             <div
               key={p.pageNum}

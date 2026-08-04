@@ -23,6 +23,25 @@ async function extractBest(paper: Paper): Promise<string[]> {
   return extractKeywords(paper.title, paper.raw_bibtex);
 }
 
+// Papers whose auto-extraction already ran but produced nothing leave no
+// keyword rows behind — without this record, every launch re-reads their
+// entire PDF just to find nothing again (painful on a 60+ paper library).
+const ATTEMPTED_KEY = "hyji:kw-extract-attempted";
+
+function loadAttempted(): Set<string> {
+  try {
+    return new Set<string>(JSON.parse(localStorage.getItem(ATTEMPTED_KEY) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveAttempted(ids: Set<string>): void {
+  try {
+    localStorage.setItem(ATTEMPTED_KEY, JSON.stringify([...ids]));
+  } catch { /* ignore */ }
+}
+
 export const useKeywordsStore = create<KeywordsState>((set, get) => ({
   keywords: [],
 
@@ -36,11 +55,17 @@ export const useKeywordsStore = create<KeywordsState>((set, get) => ({
     const db = await getDb();
     const rows = await db.select<Keyword[]>("SELECT * FROM keywords");
     const papersWithKeywords = new Set(rows.map((k) => k.paper_id));
+    // Prune ids of deleted papers so the attempted set doesn't grow forever.
+    const currentIds = new Set(papers.map((p) => p.id));
+    const attempted = new Set([...loadAttempted()].filter((id) => currentIds.has(id)));
 
     let changed = false;
+    let attemptedChanged = false;
     for (const paper of papers) {
-      if (papersWithKeywords.has(paper.id)) continue;
+      if (papersWithKeywords.has(paper.id) || attempted.has(paper.id)) continue;
       const extracted = await extractBest(paper);
+      attempted.add(paper.id);
+      attemptedChanged = true;
       for (const kw of extracted) {
         await db.execute(
           "INSERT OR IGNORE INTO keywords (paper_id, keyword, source) VALUES (?, ?, 'auto')",
@@ -49,6 +74,7 @@ export const useKeywordsStore = create<KeywordsState>((set, get) => ({
       }
       if (extracted.length > 0) changed = true;
     }
+    if (attemptedChanged) saveAttempted(attempted);
 
     if (changed || rows.length === 0) {
       const updated = await db.select<Keyword[]>("SELECT * FROM keywords");

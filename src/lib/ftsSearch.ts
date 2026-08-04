@@ -2,6 +2,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { getDb } from "./db";
 import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
+import { getBgPdfWorker } from "./pdfBgWorker";
 import type { Paper } from "../types";
 
 /**
@@ -53,7 +54,13 @@ async function ensureTables(): Promise<boolean> {
 /** Extract per-page plain text from a PDF file. */
 async function extractPages(pdfPath: string): Promise<string[]> {
   const bytes = await readFile(pdfPath);
-  const doc = await pdfjsLib.getDocument({ data: bytes, ...PDFJS_ASSET_OPTIONS }).promise;
+  // Indexing runs on the shared background worker — on the viewer's global
+  // worker, a first-run library index queues every page the user opens.
+  const doc = await pdfjsLib.getDocument({
+    data: bytes,
+    worker: getBgPdfWorker(),
+    ...PDFJS_ASSET_OPTIONS,
+  }).promise;
   const pages: string[] = [];
   try {
     for (let p = 1; p <= doc.numPages; p++) {
