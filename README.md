@@ -19,7 +19,7 @@
 
 ## What is HYJI?
 
-HYJI (pronounced *hai-jee*) is a desktop app built for researchers who spend serious time in PDFs. It combines a PDF reader, highlight/annotation tool, structured note-taking panel, and a project management layer — all in one window, all stored locally.
+HYJI (pronounced *hai-jee*) is a desktop app built for researchers who spend serious time in PDFs. It combines a PDF reader (rendered by PDFium, the engine inside Chrome and Edge), a highlight/annotation tool, a structured note-taking panel, and a project management layer — all in one window, all stored locally.
 
 No cloud. No subscriptions. No AI fluff. Just you and your papers.
 
@@ -37,6 +37,8 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Keyword graph, zero setup** — Import papers and their keywords are auto-extracted from PDF metadata. A force-directed graph in the sidebar shows how your papers connect. Click a node to filter. No manual tagging required.
 
+- **Reads like a real PDF viewer** — Pages are rasterized by PDFium with hinted, pixel-exact text, so a paper is as sharp in Focus Mode on a 100 %-scale portrait monitor as it is in Edge or Acrobat. Dark mode inverts the page but keeps figures in their true colors.
+
 - **One-glance triage** — Every paper carries a level (★ Noted · ★★ Relevant · ★★★ Core) and an optional ⚑ Revisit flag. The same stars and flag appear on sidebar rows, filter chips, the viewer toolbar and the dashboard, so you never need a legend — and a swipe on a row sets the flag.
 
 ---
@@ -47,9 +49,10 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, fit width), clickable hyperlinks and internal reference links with a "Back to reading" button, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK fonts).
 - **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in under a second: files over 20 MB are streamed to the viewer by ranges on demand instead of being read whole.
-- **Hinted text, sharp on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge), so stroke weight is uniform on standard-DPI monitors and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling; stem darkening is adjustable per engine in Preferences (Off / Subtle / Standard / Strong), and the classic pdf.js renderer remains one click away.
+- **Hinted, pixel-exact text on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge) and displayed 1:1 on device pixels, so stroke weight is uniform and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling. Preferences → *PDF render engine* switches to the classic pdf.js renderer if a document ever needs it (the app also falls back automatically when the PDFium library is unavailable), and *PDF text rendering* adds optional stem darkening per engine (Off / Subtle / Standard / Strong — PDFium defaults to Off, the crispest).
 - **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors.
 - **Multi-tab reading** — Several papers in browser-style tabs; each tab remembers its zoom and reading position, and open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a tab in the running app.
+- **Print** (Ctrl+P) — High-resolution print with your highlights, underlines and memos burned in, rendered by the same engine as the screen.
 
 ### Annotating & note-taking
 
@@ -103,7 +106,7 @@ HYJI is local-first and makes **no automatic network requests**. In full:
 2. Double-click → Next → Next → Install → Finish
 3. Launch HYJI from the Start menu — or set it as the default `.pdf` app and double-click any PDF
 
-To update, download the newest installer from the Releases page — in line with the privacy policy above, HYJI does not phone home to check for updates.
+To update, download the newest installer from the Releases page and run it over the existing installation (your library, notes and settings are kept) — in line with the privacy policy above, HYJI does not phone home to check for updates.
 
 ---
 
@@ -178,6 +181,16 @@ The built installer will be at `src-tauri/target/release/bundle/msi/`.
 ---
 
 ## Known Issues & Tips
+
+### "Save annotations to PDF" over the original file shows highlights twice
+
+**Cause:** "Save annotations to PDF" writes standard `/Highlight` / `/Underline` / `/StrikeOut` annotations into the file. If you save over the paper's own PDF instead of the suggested `…_annotated.pdf`, the viewer then draws the in-file annotations *and* HYJI's own overlay for the same text.
+
+**Fix:** Save to a separate file (the default), or run **Tools → Import Annotations from PDF** on the overwritten file — it strips the in-file copies and keeps HYJI's editable ones.
+
+### A document renders differently than in another viewer
+
+Preferences → **PDF render engine** → *pdf.js (classic)* switches back to the pre-3.0 renderer for comparison; the setting applies immediately to open tabs. Please open an issue with the PDF if PDFium gets something wrong.
 
 ### Keyword graph shows word fragments (e.g. `corre`, `turefinetuning`)
 
