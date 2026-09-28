@@ -3,33 +3,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { usePapersStore } from "../../stores/papers";
 import { onMenuEvent } from "../../lib/menuEvents";
 import { ExportDialog } from "../shared/ExportDialog";
-import type { Paper } from "../../types";
-
-const STATUS_OPTIONS = ["Surveyed", "Fully Reviewed", "Revisit Needed"] as const;
-const IMPORTANCE_OPTIONS = ["Noted", "Potentially Relevant", "Must-Cite"] as const;
-
-const statusColors: Record<string, string> = {
-  Surveyed: "bg-[#ffd16636] text-[#ffd166] border-[#ffd16644]",
-  "Fully Reviewed": "bg-[#06d6a036] text-[#06d6a0] border-[#06d6a044]",
-  "Revisit Needed": "bg-[#ff6b6b36] text-[#ff6b6b] border-[#ff6b6b44]",
-};
-const importanceColors: Record<string, string> = {
-  Noted: "bg-[#6c757d36] text-[#6c757d] border-[#6c757d44]",
-  "Potentially Relevant": "bg-[#f77f0036] text-[#f77f00] border-[#f77f0044]",
-  "Must-Cite": "bg-[#d6282836] text-[#d62828] border-[#d6282844]",
-};
-const STATUS_SHORT: Record<string, string> = {
-  Surveyed: "Srvy", "Fully Reviewed": "Rev", "Revisit Needed": "Rev!",
-};
-const IMPORTANCE_SHORT: Record<string, string> = {
-  Noted: "Ntd", "Potentially Relevant": "Rel", "Must-Cite": "Must",
-};
+import type { Paper, Level } from "../../types";
+import { LEVELS } from "../../types";
+import { LEVEL_COLOR, LEVEL_HINT, REVISIT_COLOR, REVISIT_HINT, levelStars } from "../../lib/level";
 
 interface PaperControlsProps {
-  statusFilter: string | null;
-  onStatusFilter: (v: string | null) => void;
-  importanceFilter: string | null;
-  onImportanceFilter: (v: string | null) => void;
+  levelFilter: Level | null;
+  onLevelFilter: (v: Level | null) => void;
+  revisitOnly: boolean;
+  onRevisitOnly: (v: boolean) => void;
   sortBy: string;
   onSortBy: (v: string) => void;
   selectMode: boolean;
@@ -42,8 +24,8 @@ interface PaperControlsProps {
 }
 
 export function PaperControls({
-  statusFilter, onStatusFilter,
-  importanceFilter, onImportanceFilter,
+  levelFilter, onLevelFilter,
+  revisitOnly, onRevisitOnly,
   sortBy, onSortBy,
   selectMode, onSelectMode,
   selectedIds, onSelectAll, onSelectNone,
@@ -57,7 +39,7 @@ export function PaperControls({
   useEffect(() => { papersRef.current = papers; }, [papers]);
   useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
 
-  const hasFilters = statusFilter || importanceFilter || searchQuery.trim();
+  const hasFilters = levelFilter || revisitOnly || searchQuery.trim();
 
   const openExportDialog = (papersToExport: Paper[]) => {
     if (papersToExport.length === 0) return;
@@ -130,6 +112,23 @@ export function PaperControls({
           Papers
         </span>
         <div className="flex items-center gap-1.5">
+          {/* Sort lives in the header so the chip row below never wraps at
+              the narrowest sidebar width (a wrapped row moved the chips
+              and made the ✕ / ⚑ land on the wrong line). */}
+          <select
+            value={sortBy}
+            onChange={(e) => onSortBy(e.target.value)}
+            className="text-caption bg-bg-tertiary text-text-secondary border border-border rounded px-1 py-0 outline-none focus:border-accent/40 cursor-pointer max-w-[72px]"
+            title="Sort papers"
+          >
+            <option value="manual">Order</option>
+            <option value="date_read">Date</option>
+            <option value="year">Year</option>
+            <option value="title">Title</option>
+            <option value="author">Author</option>
+            <option value="level">Level ★</option>
+            <option value="revisit">Revisit ⚑</option>
+          </select>
           <button
             onClick={() => setShowSearch((s) => !s)}
             className={`text-section transition-colors ${showSearch ? "text-accent" : "text-text-tertiary hover:text-text-secondary"}`}
@@ -163,56 +162,45 @@ export function PaperControls({
         </div>
       )}
 
-      {/* Filter chips + Sort — single compact row */}
-      <div className="px-2 pb-1.5 flex flex-wrap gap-0.5 items-center">
-        {STATUS_OPTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => onStatusFilter(statusFilter === s ? null : s)}
-            className={`px-1 py-0.5 rounded text-caption font-bold border transition-colors ${
-              statusFilter === s
-                ? statusColors[s]
-                : "bg-transparent text-text-tertiary border-transparent hover:border-border hover:text-text-secondary"
-            }`}
-          >
-            {STATUS_SHORT[s]}
-          </button>
-        ))}
+      {/* Filter chips (★ level, ⚑ revisit — same glyphs as the rows) */}
+      <div className="px-2 pb-1.5 flex flex-nowrap gap-0.5 items-center">
+        {LEVELS.map((lv) => {
+          const active = levelFilter === lv;
+          const c = LEVEL_COLOR[lv];
+          return (
+            <button
+              key={lv}
+              onClick={() => onLevelFilter(active ? null : lv)}
+              title={`${LEVEL_HINT[lv]} — click to filter`}
+              className={`px-1 py-0.5 rounded text-caption font-bold border transition-colors tracking-tighter ${
+                active ? "" : "bg-transparent text-text-tertiary border-transparent hover:border-border hover:text-text-secondary"
+              }`}
+              style={active ? { color: c, background: `${c}36`, borderColor: `${c}44` } : undefined}
+            >
+              {levelStars(lv)}
+            </button>
+          );
+        })}
         <span className="text-border mx-0.5">|</span>
-        {IMPORTANCE_OPTIONS.map((imp) => (
-          <button
-            key={imp}
-            onClick={() => onImportanceFilter(importanceFilter === imp ? null : imp)}
-            className={`px-1 py-0.5 rounded text-caption font-bold border transition-colors ${
-              importanceFilter === imp
-                ? importanceColors[imp]
-                : "bg-transparent text-text-tertiary border-transparent hover:border-border hover:text-text-secondary"
-            }`}
-          >
-            {IMPORTANCE_SHORT[imp]}
-          </button>
-        ))}
+        <button
+          onClick={() => onRevisitOnly(!revisitOnly)}
+          title={`${REVISIT_HINT} — click to show flagged papers only`}
+          className={`px-1 py-0.5 rounded text-caption font-bold border transition-colors ${
+            revisitOnly ? "" : "bg-transparent text-text-tertiary border-transparent hover:border-border hover:text-text-secondary"
+          }`}
+          style={revisitOnly ? { color: REVISIT_COLOR, background: `${REVISIT_COLOR}36`, borderColor: `${REVISIT_COLOR}44` } : undefined}
+        >
+          ⚑
+        </button>
         {hasFilters && (
           <button
-            onClick={() => { onStatusFilter(null); onImportanceFilter(null); onSearchQuery(""); }}
+            onClick={() => { onLevelFilter(null); onRevisitOnly(false); onSearchQuery(""); }}
             className="px-1 py-0.5 rounded text-caption border-transparent text-text-tertiary hover:text-accent transition-colors ml-0.5"
+            title="Clear filters"
           >
             ✕
           </button>
         )}
-        <div className="flex-1" />
-        <select
-          value={sortBy}
-          onChange={(e) => onSortBy(e.target.value)}
-          className="text-caption bg-bg-tertiary text-text-secondary border border-border rounded px-1 py-0.5 outline-none focus:border-accent/40 cursor-pointer"
-        >
-          <option value="manual">Order</option>
-          <option value="date_read">Date</option>
-          <option value="year">Year</option>
-          <option value="title">Title</option>
-          <option value="author">Author</option>
-          <option value="importance">Importance</option>
-        </select>
       </div>
 
       {/* Select mode toolbar */}

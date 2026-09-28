@@ -27,6 +27,10 @@ export const REF_TYPE_LABELS: Record<RefType, string> = {
   misc: "Misc",
 };
 
+/** v2.8 triage scale — replaces Status × Importance. Rank: Noted 1 < Relevant 2 < Core 3. */
+export type Level = "Noted" | "Relevant" | "Core";
+export const LEVELS: Level[] = ["Noted", "Relevant", "Core"];
+
 export interface Paper {
   id: string;
   project_id: string | null;
@@ -45,8 +49,10 @@ export interface Paper {
   pages: string;
   doi: string;
   abstract_text: string;
-  status: "Surveyed" | "Fully Reviewed" | "Revisit Needed";
-  importance: "Noted" | "Potentially Relevant" | "Must-Cite";
+  /** How much this paper matters to your work (★ / ★★ / ★★★). */
+  level: Level;
+  /** ⚑ "come back to this" to-do flag, independent of level (SQLite 0/1). */
+  revisit: number;
   date_read: string;
   summary: string;
   differentiation: string;

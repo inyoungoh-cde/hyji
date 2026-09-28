@@ -3,12 +3,8 @@ import { usePapersStore } from "../../stores/papers";
 import { useProjectsStore } from "../../stores/projects";
 import { useUiStore } from "../../stores/ui";
 import type { Paper } from "../../types";
-
-const statusColors: Record<string, string> = {
-  Surveyed: "bg-[#ffd16636] text-[#ffd166] border-[#ffd16644]",
-  "Fully Reviewed": "bg-[#06d6a036] text-[#06d6a0] border-[#06d6a044]",
-  "Revisit Needed": "bg-[#ff6b6b36] text-[#ff6b6b] border-[#ff6b6b44]",
-};
+import { LEVEL_COLOR, REVISIT_COLOR } from "../../lib/level";
+import { LevelBadge, RevisitBadge } from "../shared/LevelBadge";
 
 interface DashboardProps {
   onImportPdf: () => void;
@@ -27,10 +23,10 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
 
 
   // Stats
-  const surveyed = papers.filter((p) => p.status === "Surveyed").length;
-  const reviewed = papers.filter((p) => p.status === "Fully Reviewed").length;
-  const revisit = papers.filter((p) => p.status === "Revisit Needed").length;
-  const mustCite = papers.filter((p) => p.importance === "Must-Cite").length;
+  const noted = papers.filter((p) => p.level === "Noted").length;
+  const relevant = papers.filter((p) => p.level === "Relevant").length;
+  const core = papers.filter((p) => p.level === "Core").length;
+  const revisit = papers.filter((p) => !!p.revisit).length;
 
   // Recent papers: sort by date_read desc, top 6
   const recentPapers = [...papers]
@@ -96,10 +92,10 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
             <SectionHeader>Overview</SectionHeader>
             <div className="grid grid-cols-5 gap-2 mt-3">
               <StatCard label="Total" value={papers.length} />
-              <StatCard label="Surveyed" value={surveyed} accent="#ffd166" />
-              <StatCard label="Reviewed" value={reviewed} accent="#06d6a0" />
-              <StatCard label="Revisit" value={revisit} accent="#ff6b6b" />
-              <StatCard label="Must-Cite" value={mustCite} accent="#d62828" />
+              <StatCard label="★ Noted" value={noted} accent={LEVEL_COLOR.Noted} />
+              <StatCard label="★★ Relevant" value={relevant} accent={LEVEL_COLOR.Relevant} />
+              <StatCard label="★★★ Core" value={core} accent={LEVEL_COLOR.Core} />
+              <StatCard label="⚑ Revisit" value={revisit} accent={REVISIT_COLOR} />
             </div>
           </section>
         )}
@@ -302,15 +298,8 @@ function RecentPaperCard({
         )}
       </div>
       <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-        <span
-          className={`inline-block px-1.5 py-0.5 rounded text-caption font-bold border ${statusColors[paper.status] ?? ""}`}
-        >
-          {paper.status === "Fully Reviewed"
-            ? "Reviewed"
-            : paper.status === "Revisit Needed"
-              ? "Revisit"
-              : paper.status}
-        </span>
+        {!!paper.revisit && <RevisitBadge compact />}
+        <LevelBadge level={paper.level} />
         <span className="text-caption text-text-tertiary">{paper.date_read}</span>
       </div>
     </button>

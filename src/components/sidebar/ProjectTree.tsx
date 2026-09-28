@@ -6,9 +6,8 @@ import { useUiStore } from "../../stores/ui";
 import { useDragReorder } from "../../hooks/useDragReorder";
 import { usePaperDrag, PAPER_DRAG_UNASSIGNED, SWIPE_MAX } from "../../hooks/usePaperDrag";
 import { onMenuEvent, emitMenuEvent } from "../../lib/menuEvents";
-import type { Project, Paper } from "../../types";
-
-const IMPORTANCE_ORDER: Record<string, number> = { "Must-Cite": 0, "Potentially Relevant": 1, "Noted": 2 };
+import type { Project, Paper, Level } from "../../types";
+import { LEVEL_COLOR, LEVEL_HINT, LEVEL_RANK, REVISIT_COLOR, REVISIT_HINT, levelStars, normalizeLevel } from "../../lib/level";
 
 function sortPapers(papers: Paper[], sortBy: string): Paper[] {
   if (sortBy === "manual") return papers;
@@ -18,25 +17,15 @@ function sortPapers(papers: Paper[], sortBy: string): Paper[] {
       case "year": return (b.year ?? 0) - (a.year ?? 0);
       case "title": return a.title.localeCompare(b.title);
       case "author": return (a.first_author || a.authors).localeCompare(b.first_author || b.authors);
-      case "importance": return (IMPORTANCE_ORDER[a.importance] ?? 9) - (IMPORTANCE_ORDER[b.importance] ?? 9);
+      // Core first, then Relevant, then Noted
+      case "level": return LEVEL_RANK[normalizeLevel(b.level)] - LEVEL_RANK[normalizeLevel(a.level)];
+      // Flagged first; ties keep level order
+      case "revisit": return (Number(!!b.revisit) - Number(!!a.revisit))
+        || (LEVEL_RANK[normalizeLevel(b.level)] - LEVEL_RANK[normalizeLevel(a.level)]);
       default: return 0;
     }
   });
 }
-
-const statusDot: Record<string, string> = {
-  Surveyed: "text-[#ffd166]",
-  "Fully Reviewed": "text-[#06d6a0]",
-  "Revisit Needed": "text-[#ff6b6b]",
-};
-const statusHex: Record<string, string> = {
-  Surveyed: "#ffd166",
-  "Fully Reviewed": "#06d6a0",
-  "Revisit Needed": "#ff6b6b",
-};
-const STATUS_CYCLE: Paper["status"][] = ["Surveyed", "Fully Reviewed", "Revisit Needed"];
-const nextStatus = (s: string): Paper["status"] =>
-  STATUS_CYCLE[(STATUS_CYCLE.indexOf(s as Paper["status"]) + 1) % STATUS_CYCLE.length];
 
 // Swipe geometry (px): the delete button revealed on a left swipe, the
 // travel past which a release commits the action, and the full-swipe point
@@ -48,8 +37,8 @@ const SWIPE_FULL = SWIPE_MAX - 12;
 const UNASSIGNED_TARGET = PAPER_DRAG_UNASSIGNED;
 
 interface ProjectTreeProps {
-  statusFilter: string | null;
-  importanceFilter: string | null;
+  levelFilter: Level | null;
+  revisitOnly: boolean;
   sortBy: string;
   selectMode: boolean;
   selectedIds: Set<string>;
@@ -74,8 +63,8 @@ type FlatRow =
   | { kind: "unassigned-header"; isDropTarget: boolean };
 
 export function ProjectTree({
-  statusFilter,
-  importanceFilter,
+  levelFilter,
+  revisitOnly,
   sortBy,
   selectMode,
   selectedIds,
@@ -287,7 +276,7 @@ export function ProjectTree({
   }, [papers, deletePapers, onSetSelection]);
 
   // Swipe release: far left → delete (confirmation opens directly); part way
-  // left → leave the delete button showing; right → advance reading status.
+  // left → leave the delete button showing; right → toggle the Revisit flag.
   const handleSwipeEnd = (paperId: string, dx: number) => {
     if (dx <= -SWIPE_FULL) {
       setSwipeOpenId(null);
@@ -301,7 +290,7 @@ export function ProjectTree({
     setSwipeOpenId(null);
     if (dx >= SWIPE_ACT) {
       const paper = papers.find((p) => p.id === paperId);
-      if (paper) updatePaper(paper.id, { status: nextStatus(paper.status) });
+      if (paper) updatePaper(paper.id, { revisit: paper.revisit ? 0 : 1 });
     }
   };
 
@@ -341,8 +330,8 @@ export function ProjectTree({
   const getFilteredPapers = useCallback((paperList: Paper[]) => {
     return sortPapers(
       paperList.filter((p) => {
-        if (statusFilter && p.status !== statusFilter) return false;
-        if (importanceFilter && p.importance !== importanceFilter) return false;
+        if (levelFilter && normalizeLevel(p.level) !== levelFilter) return false;
+        if (revisitOnly && !p.revisit) return false;
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const hay = [p.title, p.authors, p.first_author, p.venue, p.summary].join(" ").toLowerCase();
@@ -352,7 +341,7 @@ export function ProjectTree({
       }),
       sortBy
     );
-  }, [statusFilter, importanceFilter, sortBy, searchQuery]);
+  }, [levelFilter, revisitOnly, sortBy, searchQuery]);
 
   // (Project rendering is now handled inline via flatRows virtualization)
 
@@ -441,12 +430,14 @@ export function ProjectTree({
     const isSelected = selectedIds.has(paper.id);
     const isEditingThis = editingPaperId === paper.id;
     const isDraggingThis = draggingPaperId === paper.id;
-    const dotColor = statusDot[paper.status] ?? "text-text-tertiary";
+    const level = normalizeLevel(paper.level);
+    const flagged = !!paper.revisit;
 
     const isSwiping = swipe?.paperId === paper.id;
     const swipeDx = isSwiping ? swipe.dx : swipeOpenId === paper.id ? -SWIPE_REVEAL : 0;
-    const next = nextStatus(paper.status);
-    const nextHex = statusHex[next];
+    // Right swipe toggles the flag: show what the release will do
+    const swipeRightLabel = flagged ? "⚑ Clear revisit" : "⚑ Revisit";
+    const swipeRightHex = flagged ? "#8b949e" : REVISIT_COLOR;
 
     return (
       <div className="relative overflow-hidden rounded">
@@ -468,12 +459,12 @@ export function ProjectTree({
             className="absolute inset-y-0 left-0 flex items-center pl-2 text-caption font-bold whitespace-nowrap"
             style={{
               width: SWIPE_MAX + 8,
-              background: `${nextHex}33`,
-              color: nextHex,
+              background: `${swipeRightHex}33`,
+              color: swipeRightHex,
               opacity: Math.min(1, swipeDx / SWIPE_ACT),
             }}
           >
-            → {next}
+            {swipeRightLabel}
           </div>
         )}
 
@@ -547,7 +538,16 @@ export function ProjectTree({
             <span className="truncate text-body flex-1 min-w-0">{paper.title}</span>
           )}
 
-          <span className={`text-nano flex-shrink-0 ${dotColor}`}>●</span>
+          {flagged && (
+            <span className="text-nano flex-shrink-0" style={{ color: REVISIT_COLOR }} title={REVISIT_HINT}>⚑</span>
+          )}
+          <span
+            className="text-nano flex-shrink-0 tracking-tighter"
+            style={{ color: LEVEL_COLOR[level] }}
+            title={LEVEL_HINT[level]}
+          >
+            {levelStars(level)}
+          </span>
         </div>
       </div>
     );

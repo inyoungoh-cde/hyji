@@ -778,8 +778,8 @@ export function PdfViewer() {
           showSearch={showSearch}
           onToggleSearch={() => setShowSearch((s) => !s)}
           onOpenSearch={() => useUiStore.getState().openSearchOverlay("document")}
-          status={activePaper.status}
-          importance={activePaper.importance}
+          level={activePaper.level}
+          revisit={!!activePaper.revisit}
           focusMode={focusMode}
           onToggleFocus={toggleFocusMode}
           darkMode={pdfDarkMode}

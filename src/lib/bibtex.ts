@@ -118,7 +118,7 @@ export function papersToWordRefs(papers: Paper[]): string {
 const CSV_FIELDS: (keyof Paper)[] = [
   "id", "title", "first_author", "authors", "year", "venue",
   "ref_type", "publisher", "edition", "chapter", "pages", "doi",
-  "status", "importance", "date_read", "link",
+  "level", "revisit", "date_read", "link",
   "summary", "differentiation", "questions", "pdf_path",
   "created_at", "updated_at",
 ];

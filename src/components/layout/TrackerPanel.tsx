@@ -7,8 +7,9 @@ import { BulletEditor } from "../tracker/BulletEditor";
 import { generateBibTeX } from "../../lib/bibtex";
 import { onMenuEvent } from "../../lib/menuEvents";
 import { FetchMetadataButton } from "../tracker/FetchMetadataButton";
-import type { Paper, NoteLink, RefType } from "../../types";
-import { REF_TYPE_LABELS } from "../../types";
+import type { Paper, NoteLink, RefType, Level } from "../../types";
+import { REF_TYPE_LABELS, LEVELS } from "../../types";
+import { LEVEL_COLOR, LEVEL_HINT, REVISIT_COLOR, REVISIT_HINT, levelStars, normalizeLevel } from "../../lib/level";
 
 const REF_TYPE_OPTIONS: RefType[] = [
   "article",
@@ -275,19 +276,15 @@ export function TrackerPanel() {
                 </div>
               </div>
             </div>
-            {/* Status + Importance */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <FieldSelect
-                label="Status"
-                value={activePaper.status}
-                options={["Surveyed", "Fully Reviewed", "Revisit Needed"]}
-                onChange={(v) => handleChange("status", v)}
+            {/* Level (★ / ★★ / ★★★) + Revisit flag */}
+            <div className="grid grid-cols-[1fr_auto] gap-2 mb-3">
+              <LevelControl
+                value={normalizeLevel(activePaper.level)}
+                onChange={(v) => handleChange("level", v)}
               />
-              <FieldSelect
-                label="Importance"
-                value={activePaper.importance}
-                options={["Noted", "Potentially Relevant", "Must-Cite"]}
-                onChange={(v) => handleChange("importance", v)}
+              <RevisitToggle
+                value={!!activePaper.revisit}
+                onChange={(v) => handleChange("revisit", v ? 1 : 0)}
               />
             </div>
             {/* Date Read — full width */}
@@ -365,33 +362,56 @@ function FieldInput({
   );
 }
 
-function FieldSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
+// Segmented ★ / ★★ / ★★★ picker — the same glyphs the sidebar rows, filter
+// chips and badges use, so the mapping is learned once.
+function LevelControl({ value, onChange }: { value: Level; onChange: (v: Level) => void }) {
   return (
     <div>
       <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
-        {label}
+        Level
       </label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-bg-tertiary text-body text-text-primary rounded px-2 py-1 outline-none border border-transparent focus:border-accent/40 transition-colors cursor-pointer"
+      <div className="flex rounded overflow-hidden border border-border bg-bg-tertiary">
+        {LEVELS.map((lv) => {
+          const active = lv === value;
+          const c = LEVEL_COLOR[lv];
+          return (
+            <button
+              key={lv}
+              type="button"
+              onClick={() => onChange(lv)}
+              title={LEVEL_HINT[lv]}
+              className={`flex-1 flex items-center justify-center gap-1 px-1 py-1 text-caption font-bold transition-colors border-r border-border last:border-r-0 ${
+                active ? "" : "text-text-tertiary hover:text-text-secondary hover:bg-bg-secondary"
+              }`}
+              style={active ? { color: c, background: `${c}26` } : undefined}
+            >
+              <span className="tracking-tighter">{levelStars(lv)}</span>
+              <span>{lv}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RevisitToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div>
+      <label className="block text-caption font-bold uppercase tracking-wider text-text-tertiary mb-1">
+        Revisit
+      </label>
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        title={REVISIT_HINT}
+        className={`h-[30px] px-2.5 rounded border text-caption font-bold transition-colors ${
+          value ? "" : "border-border bg-bg-tertiary text-text-tertiary hover:text-text-secondary"
+        }`}
+        style={value ? { color: REVISIT_COLOR, background: `${REVISIT_COLOR}26`, borderColor: `${REVISIT_COLOR}66` } : undefined}
       >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </select>
+        ⚑ {value ? "On" : "Off"}
+      </button>
     </div>
   );
 }

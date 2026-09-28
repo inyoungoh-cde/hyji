@@ -4,14 +4,15 @@ import { PaperControls } from "../sidebar/PaperControls";
 import { KeywordGraph } from "../sidebar/KeywordGraph";
 import { KeywordGraphFullscreen } from "../sidebar/KeywordGraphFullscreen";
 import { onMenuEvent } from "../../lib/menuEvents";
+import type { Level } from "../../types";
 
 export function Sidebar() {
   const [graphVisible, setGraphVisible] = useState(true);
   const [graphFullscreen, setGraphFullscreen] = useState(false);
 
   // Shared filter/sort/select state — passed to both ProjectTree and PaperControls
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [importanceFilter, setImportanceFilter] = useState<string | null>(null);
+  const [levelFilter, setLevelFilter] = useState<Level | null>(null);
+  const [revisitOnly, setRevisitOnly] = useState(false);
   const [sortBy, setSortBy] = useState("manual");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -51,8 +52,8 @@ export function Sidebar() {
         {/* ── PROJECTS — takes maximum space ── */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <ProjectTree
-            statusFilter={statusFilter}
-            importanceFilter={importanceFilter}
+            levelFilter={levelFilter}
+            revisitOnly={revisitOnly}
             sortBy={sortBy}
             selectMode={selectMode}
             selectedIds={selectedIds}
@@ -67,10 +68,10 @@ export function Sidebar() {
         {/* ── PAPERS filter/sort — compact bottom controls ── */}
         <div className="shrink-0">
           <PaperControls
-            statusFilter={statusFilter}
-            onStatusFilter={setStatusFilter}
-            importanceFilter={importanceFilter}
-            onImportanceFilter={setImportanceFilter}
+            levelFilter={levelFilter}
+            onLevelFilter={setLevelFilter}
+            revisitOnly={revisitOnly}
+            onRevisitOnly={setRevisitOnly}
             sortBy={sortBy}
             onSortBy={setSortBy}
             selectMode={selectMode}

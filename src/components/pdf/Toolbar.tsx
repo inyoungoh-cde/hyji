@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import type { Level } from "../../types";
+import { LevelBadge, RevisitBadge } from "../shared/LevelBadge";
 
 interface ToolbarProps {
   currentPage: number;
@@ -17,8 +19,8 @@ interface ToolbarProps {
   onToggleSearch: () => void;
   /** Opens the unified search overlay scoped to this document. */
   onOpenSearch?: () => void;
-  status?: string;
-  importance?: string;
+  level?: Level;
+  revisit?: boolean;
   focusMode?: boolean;
   onToggleFocus?: () => void;
   darkMode?: boolean;
@@ -28,22 +30,6 @@ interface ToolbarProps {
 }
 
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
-
-const statusColors: Record<string, string> = {
-  Surveyed: "bg-[#ffd16636] text-[#ffd166] border-[#ffd16644]",
-  "Fully Reviewed": "bg-[#06d6a036] text-[#06d6a0] border-[#06d6a044]",
-  "Revisit Needed": "bg-[#ff6b6b36] text-[#ff6b6b] border-[#ff6b6b44]",
-};
-const importanceColors: Record<string, string> = {
-  Noted: "bg-[#6c757d36] text-[#6c757d] border-[#6c757d44]",
-  "Potentially Relevant": "bg-[#f77f0036] text-[#f77f00] border-[#f77f0044]",
-  "Must-Cite": "bg-[#d6282836] text-[#d62828] border-[#d6282844]",
-};
-const importanceShort: Record<string, string> = {
-  Noted: "Noted",
-  "Potentially Relevant": "Relevant",
-  "Must-Cite": "Must-Cite",
-};
 
 export function Toolbar({
   currentPage,
@@ -61,8 +47,8 @@ export function Toolbar({
   showSearch,
   onToggleSearch,
   onOpenSearch,
-  status,
-  importance,
+  level,
+  revisit,
   focusMode,
   onToggleFocus,
   darkMode,
@@ -173,17 +159,9 @@ export function Toolbar({
 
       <div className="w-px h-4 bg-border mx-1" />
 
-      {/* Status + Importance badges (read-only) */}
-      {status && (
-        <span className={`px-1.5 py-0.5 rounded text-caption font-bold border ${statusColors[status] ?? ""}`}>
-          {status === "Fully Reviewed" ? "Reviewed" : status === "Revisit Needed" ? "Revisit" : status}
-        </span>
-      )}
-      {importance && (
-        <span className={`px-1.5 py-0.5 rounded text-caption font-bold border ${importanceColors[importance] ?? ""}`}>
-          {importanceShort[importance] ?? importance}
-        </span>
-      )}
+      {/* Level + Revisit badges (read-only; edit in the tracker) */}
+      {level && <LevelBadge level={level} />}
+      {revisit && <RevisitBadge />}
 
       {focusMode && (
         <button

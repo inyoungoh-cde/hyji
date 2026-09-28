@@ -131,4 +131,29 @@ async function runMigrations(db: Database): Promise<void> {
       // column/index already exists or no-op — safe to ignore
     }
   }
+
+  // v2.8 — Level × Revisit replaces Status × Importance. The old columns stay
+  // (their CHECK constraints are baked into existing DBs and are harmless);
+  // the one-time data carry-over runs exactly when `level` is first added,
+  // which also covers a database restored from a pre-2.8 backup.
+  //   importance  Noted → Noted, Potentially Relevant → Relevant, Must-Cite → Core
+  //   status      Revisit Needed → revisit = 1 (Surveyed / Fully Reviewed fold into the level)
+  let levelAdded = false;
+  try {
+    await db.execute(`ALTER TABLE papers ADD COLUMN level TEXT DEFAULT 'Noted'`);
+    levelAdded = true;
+  } catch { /* already migrated */ }
+  try {
+    await db.execute(`ALTER TABLE papers ADD COLUMN revisit INTEGER DEFAULT 0`);
+  } catch { /* already migrated */ }
+  if (levelAdded) {
+    await db.execute(`
+      UPDATE papers SET
+        level = CASE importance
+          WHEN 'Must-Cite' THEN 'Core'
+          WHEN 'Potentially Relevant' THEN 'Relevant'
+          ELSE 'Noted' END,
+        revisit = CASE WHEN status = 'Revisit Needed' THEN 1 ELSE 0 END
+    `);
+  }
 }

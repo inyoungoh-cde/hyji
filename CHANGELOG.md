@@ -7,6 +7,19 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.8] - 2026-09-28
+
+### Changed
+
+- **One triage scale instead of Status × Importance.** The two three-step fields (Surveyed / Fully Reviewed / Revisit Needed × Noted / Potentially Relevant / Must-Cite) made nine combinations, most of which never drove a decision. Each paper now has a **Level** — ★ Noted · ★★ Relevant · ★★★ Core — and an independent **⚑ Revisit** to-do flag.
+  - Existing libraries convert automatically on first launch: Importance → Level (Noted → ★, Potentially Relevant → ★★, Must-Cite → ★★★), Status "Revisit Needed" → ⚑ on. Surveyed / Fully Reviewed fold into the level (a reviewed paper's weight is what its level says). The old columns are kept in the database untouched, so a pre-2.8 backup restores cleanly.
+  - The **same glyphs everywhere** — sidebar rows (★★ ⚑ after the title), PAPERS filter chips (★ ★★ ★★★ | ⚑), sort options (Level ★, Revisit ⚑), the tracker's segmented level picker + Revisit toggle, the viewer toolbar badges, dashboard counts, CSV export (`level`, `revisit`). Shape carries the meaning; the gray → orange → red ramp (unchanged from the old importance colors) and the yellow flag are only a secondary cue, so the mapping reads without a legend and without relying on color.
+- **Swipe right on a sidebar row now toggles ⚑ Revisit** (2.7 cycled the reading status); the backdrop shows "⚑ Revisit" or "⚑ Clear revisit" while dragging.
+
+### Removed
+
+- Legacy `PaperList` component (superseded by the project tree since 1.x, unused).
+
 ## [2.7] - 2026-09-28
 
 ### Fixed

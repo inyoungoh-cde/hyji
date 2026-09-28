@@ -38,7 +38,7 @@ const GROUPS: ShortcutGroup[] = [
       { label: "Select a range of papers", keys: ["Shift", "Click"] },
       { label: "Delete selected papers", keys: ["Delete"] },
       { label: "Swipe paper row left → delete", keys: ["Drag ←"] },
-      { label: "Swipe paper row right → next status", keys: ["Drag →"] },
+      { label: "Swipe paper row right → toggle ⚑ Revisit", keys: ["Drag →"] },
       { label: "Clear selection / exit select mode", keys: ["Esc"] },
     ],
   },

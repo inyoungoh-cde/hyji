@@ -37,31 +37,48 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Keyword graph, zero setup** — Import papers and their keywords are auto-extracted from PDF metadata. A force-directed graph in the sidebar shows how your papers connect. Click a node to filter. No manual tagging required.
 
+- **One-glance triage** — Every paper carries a level (★ Noted · ★★ Relevant · ★★★ Core) and an optional ⚑ Revisit flag. The same stars and flag appear on sidebar rows, filter chips, the viewer toolbar and the dashboard, so you never need a legend — and a swipe on a row sets the flag.
+
 ---
 
 ## Features
 
-- **PDF Viewer** — Continuous scroll, zoom, text search, clickable hyperlinks and internal reference links, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK font support).
+### Reading
 
-- **Multi-tab reading** — Open several papers in browser-style tabs; each tab remembers its zoom and reading position, and your open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a new tab in the running app.
+- **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, fit width), clickable hyperlinks and internal reference links with a "Back to reading" button, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK fonts).
+- **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in under a second: files over 20 MB are streamed to the viewer by ranges on demand instead of being read whole.
+- **Sharp on every monitor** — Pages re-render when the window moves between displays with different scaling; on standard-DPI monitors text gets Acrobat-like stem darkening (strength adjustable in Preferences: Off / Subtle / Standard / Strong).
+- **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors.
+- **Multi-tab reading** — Several papers in browser-style tabs; each tab remembers its zoom and reading position, and open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a tab in the running app.
 
-- **Highlights, Underlines & Memos** — highlight/underline/strikeout in 4 colors, margin memos, and true two-way interop: "Save annotations to PDF" writes standard annotations that Adobe Acrobat and other viewers can display and edit, and annotations made elsewhere can be imported into HYJI as editable ones (Tools → Import Annotations from PDF).
+### Annotating & note-taking
 
-- **Smart Paste & metadata lookup** — Paste BibTeX, citation string, arXiv ID, or RIS — HYJI auto-detects the format and parses all fields. Or click "Fetch metadata" to look the paper up on Crossref/arXiv from its DOI/arXiv ID (auto-detected in the PDF), with a confirm-before-overwrite diff. Strictly user-initiated — see [Privacy & Network Policy](#privacy--network-policy).
+- **Highlights, underlines, strikeouts & memos** — Four colors each, margin memos, and an auto-appearing selection menu after you drag-select.
+- **Send to Differentiation / Questions** — Selected text becomes a linked bullet in the tracker; the 🔗 icon jumps back to the exact sentence.
+- **True two-way interop** — "Save annotations to PDF" writes standard annotations that Adobe Acrobat and other viewers display and edit; annotations made elsewhere are imported as editable HYJI annotations (Tools → Import Annotations from PDF).
+- **Structured notes** — Summary / Differentiation / Questions bullet editors on top; collapsible metadata (type, authors, venue, DOI ↗, abstract, keywords) below.
 
-- **Export dialog** — Choose output format (LaTeX / RIS / Word / CSV / clipboard), citation style (IEEE / ACS / Nature / APA / MLA), journal name format (full / abbreviated), and starting number. Live preview included.
+### Organizing
 
-- **Full-text search** — Ctrl+Shift+F searches your entire library: metadata *and* the text inside every PDF (Korean and English), with page-level results that jump straight to the match
+- **Level & Revisit** — ★ / ★★ / ★★★ level plus a ⚑ Revisit flag per paper. Filter chips and sort by either; the dashboard counts them.
+- **Project tree** — Collapsible nested folders with papers inline; drag a paper onto a folder, drag folders to reorder, F2 to rename. "Move to" in the context menu shows the real folder hierarchy.
+- **Multi-select** — Ctrl+click, Shift+click ranges; right-click to move or delete the whole selection, Delete key, drag them all at once.
+- **Swipe gestures** — Drag a paper row left to reveal Delete (all the way for the confirmation directly); drag right to toggle ⚑ Revisit.
+- **Keyword graph** — D3 force-directed graph of keyword co-occurrence (auto-extracted from PDF metadata, editable per paper); click a node to filter, Ctrl+G for full screen.
+- **Dashboard** — Home screen with recent papers, level/revisit counts, project shortcuts and quick actions.
 
-- **Project Tree** — Organize papers into collapsible folders, drag to reorder, inline rename with F2
+### Metadata & export
 
-- **Keyword Graph** — D3 force-directed graph of keyword co-occurrence; click a node to filter papers
+- **Smart Paste** (Ctrl+N) — Paste BibTeX, a citation string, an arXiv ID or RIS; the format is auto-detected and every field parsed. Reference types (article / conference / book / chapter / thesis / misc) with publisher, edition, chapter, pages, DOI.
+- **Fetch metadata** — One click looks the paper up on Crossref/arXiv from its DOI or arXiv ID (auto-detected in the PDF) with a confirm-before-overwrite diff. Strictly user-initiated — see [Privacy & Network Policy](#privacy--network-policy).
+- **Export dialog** — LaTeX `.bib` / RIS / Word / CSV / clipboard; citation style (IEEE / ACS / Nature / APA / MLA); journal-name format (full / abbreviated, 247-entry ISO 4 / CASSI map); starting number; live preview. Raw pasted BibTeX is exported verbatim.
+- **Full-text search** (Ctrl+Shift+F) — One overlay searches metadata, your notes *and* the text inside every PDF (Korean and English), with page-level hits that jump straight to the match; Ctrl+F scopes it to the open document.
 
-- **Auto-backup** — Configure backup folder and interval in Preferences; only backs up when changes are detected
+### Workspace
 
-- **Dashboard** — Notion-style home screen with recent papers, reading stats, and quick actions
-
-- **100% Local** — SQLite database on your disk. No account, no cloud, no tracking. Works offline forever — and an **Offline mode** switch in Preferences guarantees it.
+- **Three resizable panels** — Sidebar · viewer · tracker with draggable splitters; View → Reset Panel Sizes (or double-click a splitter) restores the defaults. Startup layout preference: research hub or viewer-only.
+- **Auto-backup** — Backup folder, interval, only-on-change and keep-last-N rotation in Preferences; a final backup on exit if anything changed.
+- **100% local** — SQLite database on your disk. No account, no cloud, no tracking. Works offline forever — and an **Offline mode** switch in Preferences guarantees it.
 
 ---
 
@@ -82,9 +99,9 @@ HYJI is local-first and makes **no automatic network requests**. In full:
 
 **[⬇ Download latest installer (.msi)](https://github.com/inyoungoh-cde/hyji/releases/latest)**
 
-1. Download `HYJI_x.x.x_x64_en-US.msi` from the Releases page
+1. Download `HYJI_x.x.x_x64_en-US.msi` (or the `-setup.exe`) from the Releases page
 2. Double-click → Next → Next → Install → Finish
-3. Launch HYJI from the Start menu
+3. Launch HYJI from the Start menu — or set it as the default `.pdf` app and double-click any PDF
 
 To update, download the newest installer from the Releases page — in line with the privacy policy above, HYJI does not phone home to check for updates.
 
@@ -92,11 +109,23 @@ To update, download the newest installer from the Releases page — in line with
 
 ## Quick Start
 
-1. **Create a project** — Click `+` in the sidebar header or `File → New Project`
-2. **Add a paper** — Drag a PDF onto the window, or `File → Import PDF`
-3. **Paste metadata** — Use `Ctrl+N` (Smart Paste) to paste BibTeX or a citation string
-4. **Highlight** — Select text in the PDF → right-click → choose a highlight color
-5. **Take notes** — Select text → right-click → `Send to Differentiation` or `Send to Questions`; click 🔗 on any linked bullet to jump back to the source
+1. **Create a project** — Click the folder icon in the sidebar header or `File → New Project`
+2. **Add a paper** — Drag a PDF onto the window, `File → Import PDF` (Ctrl+O), or double-click a PDF in Explorer
+3. **Get the metadata** — `Ctrl+N` (Smart Paste) for BibTeX / citation / arXiv ID / RIS, or **Fetch metadata** in the tracker
+4. **Highlight** — Drag-select text in the PDF → the selection menu appears → pick a highlight / underline / strikeout color
+5. **Take notes** — In the same menu choose `Send to Differentiation` or `Send to Questions`; click 🔗 on any linked bullet to jump back to the source
+6. **Triage** — Set the level (★ / ★★ / ★★★) in the tracker's Metadata section; swipe a sidebar row right to flag it ⚑ Revisit, left to delete it
+
+### Level & Revisit at a glance
+
+| Mark | Meaning |
+|------|---------|
+| ★ Noted | Skimmed or background reference (default) |
+| ★★ Relevant | Directly related to your work, may cite |
+| ★★★ Core | Must cite or compare against |
+| ⚑ Revisit | Come back to this paper — a to-do flag independent of the level |
+
+Color is only a secondary cue (gray → orange → red for the level, yellow for the flag); the star count and the flag glyph carry the meaning everywhere: sidebar rows, the PAPERS filter chips, the viewer toolbar, the dashboard and CSV export.
 
 **Keyboard shortcuts:** `Ctrl+/` shows the full list in-app.
 
@@ -175,6 +204,11 @@ Please keep PRs focused — one feature or fix per PR.
 ## Changelog
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
+
+### v2.8 (Sep 2026)
+- Status × Importance (3 × 3) replaced by one triage scale — ★ Noted / ★★ Relevant / ★★★ Core — plus a ⚑ Revisit flag; existing libraries are converted automatically (importance → level, "Revisit Needed" → flag)
+- Same stars/flag everywhere: sidebar rows, PAPERS filter chips (★ ★★ ★★★ | ⚑) and sort, tracker level picker, viewer toolbar, dashboard counts, CSV columns
+- Swipe a sidebar row right to toggle ⚑ Revisit (was: cycle status)
 
 ### v2.7 (Sep 2026)
 - Large PDFs (100+ MB proceedings volumes) open in under a second instead of several seconds, without gigabyte memory spikes — files over 20 MB are streamed to the viewer by ranges on demand
