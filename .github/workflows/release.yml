@@ -32,6 +32,10 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      # PDFium DLL is not in git; bundled as a Tauri resource (src-tauri/pdfium/)
+      - name: Fetch PDFium binary
+        run: npm run pdfium:fetch
+
       # Display version drops a trailing ".0" patch (tag v2.0.0 → release "HYJI v2.0")
       - name: Compute display version
         id: ver

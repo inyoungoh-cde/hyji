@@ -47,7 +47,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, fit width), clickable hyperlinks and internal reference links with a "Back to reading" button, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK fonts).
 - **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in under a second: files over 20 MB are streamed to the viewer by ranges on demand instead of being read whole.
-- **Sharp on every monitor** — Pages re-render when the window moves between displays with different scaling; on standard-DPI monitors text gets Acrobat-like stem darkening (strength adjustable in Preferences: Off / Subtle / Standard / Strong).
+- **Hinted text, sharp on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge), so stroke weight is uniform on standard-DPI monitors and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling; stem darkening is adjustable per engine in Preferences (Off / Subtle / Standard / Strong), and the classic pdf.js renderer remains one click away.
 - **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors.
 - **Multi-tab reading** — Several papers in browser-style tabs; each tab remembers its zoom and reading position, and open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a tab in the running app.
 
@@ -138,7 +138,8 @@ Color is only a secondary cue (gray → orange → red for the level, yellow for
 | Framework | Tauri v2 (Rust + WebView2) |
 | Frontend | React 18 + TypeScript |
 | Styling | Tailwind CSS |
-| PDF rendering | pdf.js (Mozilla) |
+| PDF rasterization | PDFium (Chromium) via `pdfium-render`, pdf.js as fallback |
+| PDF text layer / search | pdf.js (Mozilla) |
 | Database | SQLite via tauri-plugin-sql |
 | State | Zustand |
 | Build | Vite |
@@ -161,6 +162,9 @@ cd hyji
 
 # Install JS dependencies
 npm install
+
+# Fetch the PDFium library (once; bundled as an app resource)
+npm run pdfium:fetch
 
 # Run in development mode
 npm run tauri dev
@@ -204,6 +208,12 @@ Please keep PRs focused — one feature or fix per PR.
 ## Changelog
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
+
+### v3.0 (Sep 2026)
+- New page renderer: PDFium (Chrome/Edge's engine) replaces pdf.js rasterization — hinted, uniform strokes on standard-DPI monitors, which fixes the grainy/smeared text when reading in Focus Mode on a 100 %-scale portrait display; text selection, links, search and annotations stay on pdf.js
+- Verified against pdf.js with a new render-integrity harness (`tools/render-verify/`): 110 pages across 12 real papers and synthetic rotation / CropBox / annotation / scanned / mixed-size fixtures — nothing pdf.js drew is missing (≤ 0.002 % ink), identical pixel sizes
+- 260 MB proceedings volume: open ~15 ms, ~30 MB memory, ~6 ms per page
+- Preferences → PDF render engine (PDFium / pdf.js classic) with automatic fallback; stem darkening remembered per engine (PDFium default Standard 0.35 ≈ Edge/Acrobat weight)
 
 ### v2.8 (Sep 2026)
 - Status × Importance (3 × 3) replaced by one triage scale — ★ Noted / ★★ Relevant / ★★★ Core — plus a ⚑ Revisit flag; existing libraries are converted automatically (importance → level, "Revisit Needed" → flag)

@@ -3,6 +3,14 @@ import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { HighlightLayer } from "./HighlightLayer";
 import { openPdfDocument } from "../../lib/pdfSource";
+import {
+  pdfiumStatus,
+  pdfiumOpen,
+  pdfiumClose,
+  pdfiumRender,
+  pdfiumImageRegions,
+  type PdfiumDoc,
+} from "../../lib/pdfium";
 import { useUiStore } from "../../stores/ui";
 import type { Annotation } from "../../types";
 
@@ -140,7 +148,20 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
 }: PdfCanvasProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfDarkMode = useUiStore((s) => s.pdfDarkMode);
-  const textDarkening = useUiStore((s) => s.pdfTextDarkening);
+  const pdfjsDarkening = useUiStore((s) => s.pdfTextDarkening);
+  const pdfiumDarkening = useUiStore((s) => s.pdfiumTextDarkening);
+  const renderEngine = useUiStore((s) => s.pdfRenderEngine);
+  // Combined into one dependency: which strength applies is only known once
+  // a page has actually been rasterized (PDFium may fall back to pdf.js).
+  const textDarkening = `${pdfjsDarkening}/${pdfiumDarkening}`;
+  // PDFium document for the current file (v3.0). Resolves to null when the
+  // engine preference is pdf.js or the DLL is unavailable — every consumer
+  // awaits this promise, so a page is never rasterized by two engines.
+  const pdfiumRef = useRef<Promise<PdfiumDoc | null>>(Promise.resolve(null));
+  // Per-page render generation: a newer renderPage() call for the same page
+  // invalidates an older in-flight one (they'd otherwise both append layers
+  // to the container after their awaits).
+  const renderSeq = useRef<Map<number, number>>(new Map());
   // Which file the currently laid-out pages belong to. Scroll events are only
   // recorded for that file — during a tab switch the collapsing old layout
   // fires a clamped scroll-to-0 that must not overwrite the new file's memory.
@@ -266,6 +287,64 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     };
   }, [filePath, onDocLoaded]);
 
+  // Open the same file in PDFium for rasterization. Independent of the pdf.js
+  // load above (PDFium opens in milliseconds even for 260 MB files, so it is
+  // normally ready before the first page render). Closed on cleanup so the
+  // Rust-side document cache and file handle are released with the tab.
+  useEffect(() => {
+    let cancelled = false;
+    const opened: Promise<PdfiumDoc | null> = (async () => {
+      if (renderEngine !== "pdfium") return null;
+      const status = await pdfiumStatus();
+      if (!status.available) return null;
+      try {
+        const d = await pdfiumOpen(filePath);
+        if (cancelled) {
+          pdfiumClose(d.id);
+          return null;
+        }
+        return d;
+      } catch (err) {
+        console.warn("PDFium open failed, falling back to pdf.js:", err);
+        return null;
+      }
+    })();
+    pdfiumRef.current = opened;
+    return () => {
+      cancelled = true;
+      pdfiumRef.current = Promise.resolve(null);
+      opened.then((d) => { if (d) pdfiumClose(d.id); });
+    };
+  }, [filePath, renderEngine]);
+
+  // Rasterize one page into `ctx` at exactly canvas.width × canvas.height
+  // device pixels: PDFium when available, else pdf.js. `pixelScale` is the
+  // pdf.js viewport scale that produced that pixel size.
+  const rasterize = useCallback(
+    async (
+      page: pdfjsLib.PDFPageProxy,
+      pageNum: number,
+      ctx: CanvasRenderingContext2D,
+      pixelScale: number
+    ): Promise<"pdfium" | "pdfjs"> => {
+      const { width, height } = ctx.canvas;
+      const pdfium = await pdfiumRef.current;
+      if (pdfium && pdfium.pages[pageNum - 1]) {
+        try {
+          const rgba = await pdfiumRender(pdfium.id, pageNum - 1, width, height, true);
+          ctx.putImageData(new ImageData(rgba, width, height), 0, 0);
+          return "pdfium";
+        } catch (err) {
+          console.warn(`PDFium render failed for page ${pageNum}, using pdf.js:`, err);
+        }
+      }
+      const renderViewport = page.getViewport({ scale: pixelScale });
+      await page.render({ canvasContext: ctx, viewport: renderViewport } as any).promise;
+      return "pdfjs";
+    },
+    []
+  );
+
   // Render a single page
   const renderPage = useCallback(
     async (pageNum: number) => {
@@ -273,15 +352,19 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       // Skip if already rendered with these exact parameters — a dpr change
       // alone (monitor move), a darkening-preference change or a dark-mode
       // toggle must invalidate the cached bitmap.
-      const renderKey = `${scale}@${window.devicePixelRatio || 1}@${textDarkening}@${pdfDarkMode ? "d" : "l"}`;
+      const renderKey = `${renderEngine}@${scale}@${window.devicePixelRatio || 1}@${textDarkening}@${pdfDarkMode ? "d" : "l"}`;
       if (renderedPages.current.get(pageNum) === renderKey) return;
 
       const container = renderRefs.current.get(pageNum);
       if (!container) return;
       renderedPages.current.set(pageNum, renderKey);
+      const seq = (renderSeq.current.get(pageNum) ?? 0) + 1;
+      renderSeq.current.set(pageNum, seq);
+      const stale = () => renderSeq.current.get(pageNum) !== seq;
 
       try {
       const page = await doc.getPage(pageNum);
+      if (stale()) return;
       const viewport = page.getViewport({ scale });
 
       // Clear previous
@@ -299,20 +382,31 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       container.appendChild(canvas);
 
       const ctx = canvas.getContext("2d")!;
-      await page.render({ canvasContext: ctx, viewport: renderViewport } as any).promise;
+      const engineUsed = await rasterize(page, pageNum, ctx, scale * dpr);
+      if (stale()) return;
+      const darkening = engineUsed === "pdfium" ? pdfiumDarkening : pdfjsDarkening;
 
       // Bitmap-figure regions (viewport/CSS space) — used twice below: to
       // exempt photos from stem darkening, and for dark-mode counter-invert.
+      // PDFium reports image-object bounds directly; with pdf.js,
       // getOperatorList() forces a second full decode of the page (images
       // included), so only pay for it when a consumer is actually active;
       // toggling dark mode re-renders (it is part of the render key above).
-      const needImageRegions = pdfDarkMode || (dpr < 1.5 && textDarkening > 0);
+      const needImageRegions = pdfDarkMode || (dpr < 1.5 && darkening > 0);
       let imageRegions: Array<{ x: number; y: number; w: number; h: number }> = [];
       if (needImageRegions) {
         try {
-          const opList = await page.getOperatorList();
-          imageRegions = computeImageRegions(opList, viewport);
+          const pdfium = engineUsed === "pdfium" ? await pdfiumRef.current : null;
+          if (pdfium) {
+            imageRegions = (await pdfiumImageRegions(pdfium.id, pageNum - 1)).map((r) => ({
+              x: r.x * scale, y: r.y * scale, w: r.w * scale, h: r.h * scale,
+            }));
+          } else {
+            const opList = await page.getOperatorList();
+            imageRegions = computeImageRegions(opList, viewport);
+          }
         } catch { /* best-effort */ }
+        if (stale()) return;
       }
 
       // Stem darkening: pdf.js draws glyphs with plain grayscale antialiasing
@@ -322,7 +416,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       // the midtones — antialiased glyph edges get pulled darker while white
       // paper stays white. Photos/figures are clipped out to keep their tones.
       // Strength is a preference (0 = off); high-DPI displays don't need it.
-      if (dpr < 1.5 && textDarkening > 0) {
+      if (dpr < 1.5 && darkening > 0) {
         ctx.save();
         if (imageRegions.length > 0) {
           ctx.beginPath();
@@ -333,7 +427,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
           ctx.clip("evenodd");
         }
         ctx.globalCompositeOperation = "multiply";
-        ctx.globalAlpha = textDarkening;
+        ctx.globalAlpha = darkening;
         ctx.drawImage(canvas, 0, 0);
         ctx.restore();
       }
@@ -516,13 +610,14 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         // TODO: reference tooltip preview (deferred)
       })();
       } catch (err) {
+        if (stale()) return;
         // Render failed (e.g. the document was destroyed mid-flight during a
         // tab switch) — forget the render key so a later pass can retry.
         renderedPages.current.delete(pageNum);
         console.warn(`Render failed for page ${pageNum}:`, err);
       }
     },
-    [doc, scale, textDarkening, pdfDarkMode]
+    [doc, scale, textDarkening, pdfjsDarkening, pdfiumDarkening, pdfDarkMode, renderEngine, rasterize]
   );
 
   // Single component-level "drag ended" listener for all text layers —
@@ -551,7 +646,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
         const ctx = canvas.getContext("2d")!;
-        await page.render({ canvasContext: ctx, viewport } as any).promise;
+        await rasterize(page, p.pageNum, ctx, PRINT_SCALE);
 
         // Burn highlights from annotations — match viewer's HighlightLayer exactly
         for (const ann of annotations) {
@@ -597,7 +692,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     scrollToY: (y: number) => {
       containerRef.current?.scrollTo({ top: y, behavior: "smooth" });
     },
-  }), [pages, doc, renderPage, annotations]);
+  }), [pages, doc, renderPage, annotations, rasterize]);
 
   // Re-render when scale / devicePixelRatio / rendering prefs change — the
   // text layer and highlight overlay are rebuilt inside renderPage (container
@@ -617,7 +712,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         renderPage(p.pageNum);
       }
     }
-  }, [scale, dpr, textDarkening, pages, renderPage]);
+  }, [scale, dpr, textDarkening, renderEngine, pages, renderPage]);
 
   // Restore the last reading position when this document (re)loads,
   // e.g. after switching back to its tab. Only after this runs do scroll

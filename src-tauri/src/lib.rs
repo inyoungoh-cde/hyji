@@ -1,5 +1,6 @@
 mod backup;
 mod commands;
+pub mod pdfium;
 
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
@@ -87,6 +88,12 @@ pub fn run() {
             commands::http_get_text,
             commands::file_size,
             commands::read_file_range,
+            pdfium::pdfium_status,
+            pdfium::pdfium_open,
+            pdfium::pdfium_close,
+            pdfium::pdfium_close_path,
+            pdfium::pdfium_render,
+            pdfium::pdfium_image_regions,
             set_export_selected_enabled,
             take_pending_open_files,
             get_backup_config,
@@ -211,6 +218,7 @@ pub fn run() {
             // Last-chance backup of a dirty DB when the app is closing
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 backup::backup_on_exit(app);
+                pdfium::shutdown();
             }
         });
 }

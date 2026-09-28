@@ -521,6 +521,11 @@ export function PdfViewer() {
           }
 
           try {
+            // Release PDFium's handle on the file before rewriting it in
+            // place; the reload nonce below remounts the viewer, which
+            // reopens the cleaned file.
+            const { pdfiumClosePath } = await import("../../lib/pdfium");
+            await pdfiumClosePath(paper.pdf_path);
             await writeFile(paper.pdf_path, cleaned);
             setPdfReloadNonce((n) => n + 1);
             await message(`Imported ${found.length} annotation(s) into HYJI.`, { title: "Import Annotations", kind: "info" });

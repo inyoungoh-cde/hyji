@@ -7,6 +7,28 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [3.0] - 2026-09-28
+
+### Changed
+
+- **New page renderer: PDFium.** Pages are now rasterized by PDFium — the engine behind Chrome's and Edge's PDF viewers — instead of pdf.js. pdf.js draws glyphs without font hinting, so on standard-DPI monitors (a 1080×1920 portrait display at 100 %, a FHD laptop) stroke weight wobbled from letter to letter; the 2.2/2.3 stem darkening made text darker but could not make it *even*, and that unevenness is what reads as "grainy" or "smeared" after moving a paper from a 125 % monitor to a 100 % one for Focus Mode. Measured on the same portrait monitor, same page, same width (vertical stem widths 1 / 2 / 3 / 4–6 px): pdf.js + darkening **9 / 61 / 19 / 12 %**, Edge **50 / 41 / 6 / 2 %**, HYJI 3.0 **43 / 46 / 8 / 4 %** — strokes are now one or two pixels wide like every other hinted viewer.
+  - Only rasterization changed. Text selection, highlights, links, search, metadata extraction and annotation import/export still run on pdf.js, so nothing about notes or annotations moves.
+  - **Verified against the old renderer, not just eyeballed.** A new offline harness (`tools/render-verify/`) renders the same pages with pdf.js and PDFium at identical pixel sizes and checks structural similarity plus *dilated ink coverage* — the share of ink one engine drew that the other didn't. Across 12 real papers from a library plus synthetic fixtures (/Rotate 90 & 270, inset and offset CropBox, UserUnit, AP-stream Highlight/Underline/StrikeOut/Text annotations, an image-only scanned page, mixed page sizes; 110 pages in all) the content pdf.js drew that PDFium missed is ≤ 0.002 % on every page — including Korean/CID fonts — and pixel sizes matched exactly on every page.
+  - **Large files get faster again.** PDFium opens through random file access: the 736-page / 260 MB proceedings volume loads in ~15 ms with a ~30 MB working set and renders a page in ~6 ms.
+  - **Preferences → PDF render engine** lets you switch back to *pdf.js (classic)* per document set if something ever renders differently; the app also falls back to pdf.js automatically when the PDFium library cannot be loaded, and the Preferences panel says which engine is active.
+  - **PDF text rendering** (stem darkening) now remembers a separate strength per engine. PDFium's hinted glyphs need a much lighter touch: its scale is Off / Subtle 0.2 / Standard 0.35 / Strong 0.5, default *Standard*, which lands on Edge/Acrobat ink density (measured mean ink luminance 91.8 vs Edge 93.5 at 0.35; the old 0.65 would over-darken). Your pdf.js setting is kept untouched for the classic engine.
+  - Dark mode's figure protection (photos keep true colours while text inverts) now takes image bounds straight from PDFium instead of decoding the page a second time with pdf.js.
+  - Print uses the same engine as the screen.
+
+### Fixed
+
+- Two renders of the same page could interleave during fast tab switches or monitor moves and leave duplicated text layers behind; page renders are now generation-checked.
+- "Import Annotations from PDF" releases the renderer's file handle before rewriting the PDF in place.
+
+### Internal
+
+- `pdfium.dll` (bblanchon/pdfium-binaries, Chromium 8066) is bundled as an app resource; `npm run pdfium:fetch` downloads it for local builds and the release workflow fetches it in CI. New Rust module `src-tauri/src/pdfium.rs` (document cache keyed by path + mtime + size, refcounted handles, async commands on the blocking pool, RGBA pages over the binary IPC channel, image-region extraction with form-XObject recursion, rotation/CropBox unit tests).
+
 ## [2.8] - 2026-09-28
 
 ### Changed

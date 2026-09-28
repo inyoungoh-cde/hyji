@@ -1,14 +1,15 @@
 {
   "name": "hyji",
   "private": true,
-  "version": "2.8.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "gen-icons": "node scripts/gen-icons.cjs"
+    "gen-icons": "node scripts/gen-icons.cjs",
+    "pdfium:fetch": "node scripts/fetch-pdfium.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.23",

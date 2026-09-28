@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export type TextSize = "normal" | "large" | "xlarge";
+export type PdfRenderEngine = "pdfium" | "pdfjs";
 
 // Startup layout preference — what the panels look like when HYJI launches.
 // "remember": restore whatever the user had last session.
@@ -105,6 +106,14 @@ interface UiState {
   /** Stem-darkening strength for PDF text on standard-DPI displays (0 = off).
    *  Compensates for pdf.js's unhinted antialiasing looking thin vs Acrobat. */
   pdfTextDarkening: number;
+  /** Same pass for the PDFium engine. PDFium's hinted glyphs are already
+   *  uniform, so a much lighter touch matches Edge/Acrobat weight (measured:
+   *  0.35 → mean ink luminance 91.8 vs Edge 93.5; 0.65 would over-darken). */
+  pdfiumTextDarkening: number;
+  /** Page rasterizer (v3.0): "pdfium" = hinted glyphs via the bundled PDFium
+   *  DLL (falls back to pdf.js when the DLL is unavailable); "pdfjs" = the
+   *  pre-3.0 renderer. Text layer, links and search always stay on pdf.js. */
+  pdfRenderEngine: PdfRenderEngine;
   focusMode: boolean;
   preFocusState: PreFocusState | null;
 
@@ -127,6 +136,8 @@ interface UiState {
   setTextSize: (size: TextSize) => void;
   togglePdfDarkMode: () => void;
   setPdfTextDarkening: (v: number) => void;
+  setPdfiumTextDarkening: (v: number) => void;
+  setPdfRenderEngine: (e: PdfRenderEngine) => void;
   enterFocusMode: (snapshot: PreFocusState) => void;
   exitFocusMode: () => PreFocusState | null;
 }
@@ -143,15 +154,22 @@ function loadNumber(key: string, fallback: number): number {
   }
 }
 
-function loadPdfTextDarkening(): number {
+function loadDarkening(key: string, fallback: number): number {
   try {
-    const v = localStorage.getItem("hyji:pdf-text-darkening");
+    const v = localStorage.getItem(key);
     if (v !== null) {
       const n = Number(v);
       if (!Number.isNaN(n) && n >= 0 && n <= 1) return n;
     }
   } catch { /* ignore */ }
-  return 0.65;
+  return fallback;
+}
+
+function loadPdfRenderEngine(): PdfRenderEngine {
+  try {
+    if (localStorage.getItem("hyji:pdf-render-engine") === "pdfjs") return "pdfjs";
+  } catch { /* ignore */ }
+  return "pdfium";
 }
 
 function loadTextSize(): TextSize {
@@ -178,7 +196,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   searchOverlayScope: null,
   textSize: loadTextSize(),
   pdfDarkMode: loadBool("hyji:pdf-dark", false),
-  pdfTextDarkening: loadPdfTextDarkening(),
+  pdfTextDarkening: loadDarkening("hyji:pdf-text-darkening", 0.65),
+  pdfiumTextDarkening: loadDarkening("hyji:pdfium-text-darkening", 0.35),
+  pdfRenderEngine: loadPdfRenderEngine(),
   focusMode: false,
   preFocusState: null,
 
@@ -269,6 +289,14 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPdfTextDarkening: (v) => {
     try { localStorage.setItem("hyji:pdf-text-darkening", String(v)); } catch { /* ignore */ }
     set({ pdfTextDarkening: v });
+  },
+  setPdfiumTextDarkening: (v) => {
+    try { localStorage.setItem("hyji:pdfium-text-darkening", String(v)); } catch { /* ignore */ }
+    set({ pdfiumTextDarkening: v });
+  },
+  setPdfRenderEngine: (e) => {
+    try { localStorage.setItem("hyji:pdf-render-engine", e); } catch { /* ignore */ }
+    set({ pdfRenderEngine: e });
   },
   togglePdfDarkMode: () =>
     set((s) => {

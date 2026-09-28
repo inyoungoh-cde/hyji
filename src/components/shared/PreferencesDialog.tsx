@@ -13,8 +13,18 @@ import {
   saveStartupLayout,
   useUiStore,
   type StartupLayout,
+  type PdfRenderEngine,
 } from "../../stores/ui";
 import { useNetworkStore } from "../../stores/network";
+import { pdfiumStatus, type PdfiumStatus } from "../../lib/pdfium";
+
+// Page rasterizer (v3.0). PDFium hints glyphs like Chrome/Edge's viewer, which
+// is what fixes uneven stroke weight on standard-DPI monitors; pdf.js stays
+// selectable as the pre-3.0 look and as the automatic fallback.
+const ENGINE_OPTIONS: { value: PdfRenderEngine; label: string; hint: string }[] = [
+  { value: "pdfium", label: "PDFium (recommended)", hint: "Chrome/Edge's PDF engine — hinted, uniform text on every monitor" },
+  { value: "pdfjs", label: "pdf.js (classic)", hint: "The pre-3.0 renderer — no hinting; use if a document renders wrong in PDFium" },
+];
 
 const LAYOUT_OPTIONS: { value: StartupLayout; label: string; hint: string }[] = [
   { value: "remember", label: "Remember last layout", hint: "Panels reopen exactly as you left them" },
@@ -30,6 +40,14 @@ const DARKENING_OPTIONS: { value: number; label: string; hint: string }[] = [
   { value: 0.35, label: "Subtle", hint: "A touch more weight, closest to the default look" },
   { value: 0.65, label: "Standard", hint: "Acrobat-like stroke weight (recommended)" },
   { value: 0.85, label: "Strong", hint: "Boldest — for low-contrast displays" },
+];
+// PDFium already hints glyphs, so the same pass needs a lighter hand: 0.35
+// lands on Edge/Acrobat ink density (measured), 0.65 would look bold.
+const PDFIUM_DARKENING_OPTIONS: { value: number; label: string; hint: string }[] = [
+  { value: 0, label: "Off", hint: "PDFium's native rendering — same as Edge's viewer, slightly lighter than Acrobat" },
+  { value: 0.2, label: "Subtle", hint: "A touch more ink" },
+  { value: 0.35, label: "Standard", hint: "Acrobat-like stroke weight (recommended)" },
+  { value: 0.5, label: "Strong", hint: "Boldest — for low-contrast displays" },
 ];
 
 interface PreferencesDialogProps {
@@ -63,6 +81,12 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const setOfflineMode = useNetworkStore((s) => s.setOfflineMode);
   const pdfTextDarkening = useUiStore((s) => s.pdfTextDarkening);
   const setPdfTextDarkening = useUiStore((s) => s.setPdfTextDarkening);
+  const pdfRenderEngine = useUiStore((s) => s.pdfRenderEngine);
+  const setPdfRenderEngine = useUiStore((s) => s.setPdfRenderEngine);
+  const pdfiumTextDarkening = useUiStore((s) => s.pdfiumTextDarkening);
+  const setPdfiumTextDarkening = useUiStore((s) => s.setPdfiumTextDarkening);
+  const [engineStatus, setEngineStatus] = useState<PdfiumStatus | null>(null);
+  const usingPdfium = pdfRenderEngine === "pdfium" && engineStatus?.available !== false;
   const politeEmail = useNetworkStore((s) => s.politeEmail);
   const setPoliteEmail = useNetworkStore((s) => s.setPoliteEmail);
 
@@ -74,6 +98,7 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    pdfiumStatus().then((s) => { if (!cancelled) setEngineStatus(s); });
     (async () => {
       try {
         const [cfg, st] = await Promise.all([getBackupConfig(), getBackupStatus()]);
@@ -158,18 +183,18 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
             </div>
           </Section>
 
-          <Section label="PDF text rendering">
+          <Section label="PDF render engine">
             <div className="flex flex-col gap-2">
-              {DARKENING_OPTIONS.map((o) => (
+              {ENGINE_OPTIONS.map((o) => (
                 <label
                   key={o.value}
                   className="flex items-start gap-2 text-body text-text-primary cursor-pointer"
                 >
                   <input
                     type="radio"
-                    name="pdf-text-darkening"
-                    checked={pdfTextDarkening === o.value}
-                    onChange={() => setPdfTextDarkening(o.value)}
+                    name="pdf-render-engine"
+                    checked={pdfRenderEngine === o.value}
+                    onChange={() => setPdfRenderEngine(o.value)}
                     className="accent-[#58a6ff] mt-0.5"
                   />
                   <span>
@@ -180,9 +205,39 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
               ))}
             </div>
             <p className="mt-2 text-caption text-text-tertiary leading-relaxed">
-              Text stroke weight on standard-DPI monitors (100% display scale). Applies
-              immediately to the open PDF — try each option and pick what reads best.
-              High-DPI monitors (125%+ scale) are unaffected.
+              {engineStatus === null
+                ? "Checking PDFium…"
+                : engineStatus.available
+                  ? `PDFium ${engineStatus.version ?? ""} loaded. Applies immediately to open PDFs. Text selection, links and search always use pdf.js.`
+                  : `PDFium is not available (${engineStatus.error ?? "unknown error"}) — pdf.js is used regardless of this setting.`}
+            </p>
+          </Section>
+
+          <Section label="PDF text rendering">
+            <div className="flex flex-col gap-2">
+              {(usingPdfium ? PDFIUM_DARKENING_OPTIONS : DARKENING_OPTIONS).map((o) => (
+                <label
+                  key={o.value}
+                  className="flex items-start gap-2 text-body text-text-primary cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="pdf-text-darkening"
+                    checked={(usingPdfium ? pdfiumTextDarkening : pdfTextDarkening) === o.value}
+                    onChange={() => (usingPdfium ? setPdfiumTextDarkening : setPdfTextDarkening)(o.value)}
+                    className="accent-[#58a6ff] mt-0.5"
+                  />
+                  <span>
+                    {o.label}
+                    <span className="block text-caption text-text-tertiary">{o.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-caption text-text-tertiary leading-relaxed">
+              Text stroke weight on standard-DPI monitors (100–125% display scale) for the
+              {usingPdfium ? " PDFium" : " pdf.js"} engine — each engine remembers its own
+              setting. Applies immediately to the open PDF; 150%+ monitors are unaffected.
             </p>
           </Section>
 
