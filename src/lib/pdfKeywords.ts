@@ -1,15 +1,6 @@
-import * as pdfjsLib from "pdfjs-dist";
-import { readFile } from "@tauri-apps/plugin-fs";
-import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
+import { openPdfDocument } from "./pdfSource";
 import { getBgPdfWorker } from "./pdfBgWorker";
 import { parseKeywordString } from "./keywordExtract";
-
-try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.mjs",
-    import.meta.url
-  ).toString();
-} catch { /* ignore */ }
 
 // Common multi-syllable suffixes that, when found mid-keyword, betray a concatenation.
 // e.g. "turefinetuning" ends with "finetuning" with "ture" before it → garbled.
@@ -38,35 +29,39 @@ function looksGarbled(keywords: string[]): boolean {
 export async function extractKeywordsFromPdf(pdfPath: string): Promise<string[]> {
   if (!pdfPath) return [];
   try {
-    const bytes = await readFile(pdfPath);
-
-    // 1b. XMP metadata — search raw bytes BEFORE passing to pdfjs.
-    //     pdfjs transfers (detaches) the ArrayBuffer when loading, so we must
-    //     search the bytes first. Some publishers (Oxford Academic, Springer)
-    //     store keywords only in XMP, leaving the PDF info-dict /Keywords empty.
-    try {
-      // Keep a copy of the buffer for pdfjs (slice transfers ownership safely)
-      const rawText = new TextDecoder("latin1", { fatal: false }).decode(bytes);
-      const xmpMatch = rawText.match(/<pdf:Keywords[^>]*>([^<]{3,1000})<\/pdf:Keywords>/i);
-      if (xmpMatch?.[1]?.trim()) {
-        const parsed = parseKeywordString(xmpMatch[1].trim());
-        if (parsed.length > 0) return parsed;
-      }
-    } catch { /* ignore */ }
-
-    // Pass a copy to pdfjs so the original bytes stay intact if needed later.
-    // Runs on the shared background worker so it never queues viewer renders.
-    const doc = await pdfjsLib.getDocument({
-      data: bytes.slice(),
+    // 1b. XMP metadata in the raw bytes. Some publishers (Oxford Academic,
+    //     Springer) store keywords only in XMP, leaving the info-dict
+    //     /Keywords empty — and occasionally the XMP packet is not reachable
+    //     from the catalog, so pdf.js's parsed metadata misses it. Only
+    //     whole-file loads expose the bytes; for large (ranged) files the
+    //     parsed metadata below is the source — decoding a 260 MB volume into
+    //     a JS string on the main thread was a multi-second freeze.
+    let xmpKeywords: string[] = [];
+    const doc = await openPdfDocument(pdfPath, {
       worker: getBgPdfWorker(),
-      ...PDFJS_ASSET_OPTIONS,
-    }).promise;
+      inspectBytes: (bytes) => {
+        try {
+          const rawText = new TextDecoder("latin1", { fatal: false }).decode(bytes);
+          const xmpMatch = rawText.match(/<pdf:Keywords[^>]*>([^<]{3,1000})<\/pdf:Keywords>/i);
+          if (xmpMatch?.[1]?.trim()) xmpKeywords = parseKeywordString(xmpMatch[1].trim());
+        } catch { /* ignore */ }
+      },
+    });
     try {
-      // 1a. PDF info-dict Keywords field (most common format)
+      if (xmpKeywords.length > 0) return xmpKeywords;
+
+      // 1a. PDF info-dict Keywords field (most common format), then the
+      //     XMP packet pdf.js already parsed from the catalog.
       const meta = await doc.getMetadata();
       const metaKw = (meta.info as Record<string, string>)?.Keywords ?? "";
       if (metaKw.trim()) {
         const parsed = parseKeywordString(metaKw);
+        if (parsed.length > 0) return parsed;
+      }
+      const xmp = meta.metadata?.get("pdf:keywords") ?? meta.metadata?.get("pdf:Keywords");
+      const xmpStr = Array.isArray(xmp) ? xmp.join(", ") : typeof xmp === "string" ? xmp : "";
+      if (xmpStr.trim()) {
+        const parsed = parseKeywordString(xmpStr);
         if (parsed.length > 0) return parsed;
       }
 

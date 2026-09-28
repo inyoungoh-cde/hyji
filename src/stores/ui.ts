@@ -110,6 +110,8 @@ interface UiState {
 
   setSidebarWidth: (w: number) => void;
   setTrackerWidth: (w: number) => void;
+  /** View → Reset Panel Sizes / splitter double-click: back to the defaults. */
+  resetPanelSizes: () => void;
   toggleSidebar: () => void;
   toggleTracker: () => void;
   setActivePaper: (id: string | null) => void;
@@ -129,8 +131,8 @@ interface UiState {
   exitFocusMode: () => PreFocusState | null;
 }
 
-const SIDEBAR_DEFAULT = 200;
-const TRACKER_DEFAULT = 320;
+export const SIDEBAR_DEFAULT = 200;
+export const TRACKER_DEFAULT = 320;
 
 function loadNumber(key: string, fallback: number): number {
   try {
@@ -187,6 +189,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   setTrackerWidth: (w) => {
     localStorage.setItem("hyji:tracker-width", String(w));
     set({ trackerWidth: w });
+  },
+  resetPanelSizes: () => {
+    get().setSidebarWidth(SIDEBAR_DEFAULT);
+    get().setTrackerWidth(TRACKER_DEFAULT);
   },
   toggleSidebar: () =>
     set((s) => {

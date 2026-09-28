@@ -7,6 +7,21 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [2.7] - 2026-09-28
+
+### Fixed
+
+- **Large PDFs (conference proceedings volumes, scanned books) took seconds to open and spiked memory by gigabytes** — every open pushed the whole file through the Tauri IPC bridge into JS memory (a 260 MB volume meant a 260 MB response, a 260 MB JS buffer and a worker copy), and the keyword scan and the search indexer each read it again; the keyword scan additionally decoded the entire file into a JS string on the UI thread. Files over 20 MB are now streamed to pdf.js in 512 KB ranges on demand, so only the bytes needed for the pages you actually look at are read. Measured on a 736-page, 260 MB volume (same machine, same file): hand-over → first page **2.5 s → 0.9 s**, main-process peak **1.95 GB → 45 MB**, WebView peak **1.6 GB → ~0.65 GB**.
+- Search-index writes are batched (40 pages per statement) — a 700-page volume previously issued ~700 separate inserts.
+- A PDF handed to HYJI by file association could be dropped if the window remounted while the path was being read from the launch queue.
+
+### Added
+
+- **Multi-select in the sidebar** — Ctrl+click toggles papers, Shift+click selects a range. Right-click then acts on the whole selection (*Move N papers to…*, *Delete N papers*), the Delete key deletes it, Esc clears it, and dragging any selected paper onto a folder moves them all. *Export Selected…* accepts these selections too.
+- **"Move to" shows the real folder tree** — nested folders are indented under guide lines (KIST ▸ RFP ▸ papers) and the current folder is marked, instead of a flat list.
+- **Swipe gestures on paper rows** — drag a row left to reveal *Delete* (drag it all the way to go straight to the confirmation); drag right to advance the reading status (Surveyed → Fully Reviewed → Revisit Needed).
+- **View → Reset Panel Sizes** restores the default sidebar and tracker widths; double-clicking a splitter resets that one panel.
+
 ## [2.6] - 2026-08-04
 
 ### Fixed

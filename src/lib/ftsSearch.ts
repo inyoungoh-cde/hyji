@@ -1,7 +1,5 @@
-import * as pdfjsLib from "pdfjs-dist";
-import { readFile } from "@tauri-apps/plugin-fs";
 import { getDb } from "./db";
-import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
+import { openPdfDocument } from "./pdfSource";
 import { getBgPdfWorker } from "./pdfBgWorker";
 import type { Paper } from "../types";
 
@@ -53,14 +51,9 @@ async function ensureTables(): Promise<boolean> {
 
 /** Extract per-page plain text from a PDF file. */
 async function extractPages(pdfPath: string): Promise<string[]> {
-  const bytes = await readFile(pdfPath);
   // Indexing runs on the shared background worker — on the viewer's global
   // worker, a first-run library index queues every page the user opens.
-  const doc = await pdfjsLib.getDocument({
-    data: bytes,
-    worker: getBgPdfWorker(),
-    ...PDFJS_ASSET_OPTIONS,
-  }).promise;
+  const doc = await openPdfDocument(pdfPath, { worker: getBgPdfWorker() });
   const pages: string[] = [];
   try {
     for (let p = 1; p <= doc.numPages; p++) {
@@ -92,11 +85,22 @@ export async function indexPaper(paper: Paper): Promise<void> {
   const db = await getDb();
   const pages = await extractPages(paper.pdf_path);
   await db.execute("DELETE FROM pdf_fts WHERE paper_id = ?", [paper.id]);
+  // Multi-row INSERTs: one statement (one fsync) per batch instead of one per
+  // page — a 700-page volume went through ~700 separate writes. Explicit
+  // BEGIN/COMMIT is not an option here: tauri-plugin-sql hands each execute
+  // to a pooled connection, so a transaction can't span calls.
+  const BATCH = 40;
+  const rows: Array<[number, string]> = [];
   for (let i = 0; i < pages.length; i++) {
-    if (!pages[i]) continue;
+    if (pages[i]) rows.push([i + 1, pages[i]]);
+  }
+  for (let start = 0; start < rows.length; start += BATCH) {
+    const slice = rows.slice(start, start + BATCH);
+    const params: unknown[] = [];
+    for (const [page, body] of slice) params.push(paper.id, page, body);
     await db.execute(
-      "INSERT INTO pdf_fts (paper_id, page, body) VALUES (?, ?, ?)",
-      [paper.id, i + 1, pages[i]]
+      `INSERT INTO pdf_fts (paper_id, page, body) VALUES ${slice.map(() => "(?, ?, ?)").join(", ")}`,
+      params
     );
   }
   await db.execute(

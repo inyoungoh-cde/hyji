@@ -57,6 +57,7 @@ export function Sidebar() {
             selectMode={selectMode}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
+            onSetSelection={setSelectedIds}
             searchQuery={searchQuery}
           />
         </div>

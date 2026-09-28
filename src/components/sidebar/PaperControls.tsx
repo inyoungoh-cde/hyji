@@ -70,7 +70,7 @@ export function PaperControls({
     if (selected.length === 0) {
       const { message } = await import("@tauri-apps/plugin-dialog");
       await message(
-        "No papers selected. Turn on Selection Mode (Ctrl+Shift+S) and check the papers you want to export.",
+        "No papers selected. Ctrl+click / Shift+click papers in the sidebar, or turn on Selection Mode (Ctrl+Shift+S) and check the papers you want to export.",
         { title: "Export Selected", kind: "info" }
       );
       return;
@@ -111,10 +111,11 @@ export function PaperControls({
 
   // Ctrl+Shift+F is owned by the global search overlay (App.tsx).
 
-  // Gray out File > Export Selected... while nothing is selected.
+  // Gray out File > Export Selected... while nothing is selected. Ctrl/Shift
+  // click selections count too, not only checkbox (select-mode) ones.
   // Disabled on unmount too: with the sidebar hidden there is no selection.
   useEffect(() => {
-    const enabled = selectMode && selectedIds.size > 0;
+    const enabled = selectedIds.size > 0;
     invoke("set_export_selected_enabled", { enabled }).catch(() => undefined);
   }, [selectMode, selectedIds]);
   useEffect(() => () => {

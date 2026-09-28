@@ -2,10 +2,12 @@ import { useCallback, useRef } from "react";
 
 interface SplitterProps {
   onResize: (delta: number) => void;
+  /** Double-click: restore this panel's default width. */
+  onReset?: () => void;
   direction?: "left" | "right";
 }
 
-export function Splitter({ onResize, direction = "left" }: SplitterProps) {
+export function Splitter({ onResize, onReset, direction = "left" }: SplitterProps) {
   const onResizeRef = useRef(onResize);
   onResizeRef.current = onResize;
 
@@ -38,6 +40,8 @@ export function Splitter({ onResize, direction = "left" }: SplitterProps) {
   return (
     <div
       onMouseDown={onMouseDown}
+      onDoubleClick={onReset}
+      title={onReset ? "Drag to resize · double-click to reset" : undefined}
       className="w-[6px] shrink-0 cursor-col-resize bg-bg-primary hover:bg-accent/30 transition-colors duration-150"
     />
   );

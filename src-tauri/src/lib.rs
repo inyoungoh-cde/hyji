@@ -85,6 +85,8 @@ pub fn run() {
             commands::update_paper,
             commands::delete_paper,
             commands::http_get_text,
+            commands::file_size,
+            commands::read_file_range,
             set_export_selected_enabled,
             take_pending_open_files,
             get_backup_config,
@@ -147,6 +149,7 @@ pub fn run() {
             let view_menu = SubmenuBuilder::new(app, "View")
                 .text("toggle-sidebar", "Toggle Sidebar\tCtrl+B")
                 .text("toggle-tracker", "Toggle Tracker Panel\tCtrl+J")
+                .text("reset-layout", "Reset Panel Sizes")
                 .separator()
                 .text("focus-mode", "Focus Mode\tCtrl+L")
                 .text("pdf-dark-mode", "PDF Dark Mode\tCtrl+D")

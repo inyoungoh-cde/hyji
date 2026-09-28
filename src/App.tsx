@@ -11,7 +11,7 @@ import { KeyboardShortcutsModal } from "./components/shared/KeyboardShortcutsMod
 import { PreferencesDialog } from "./components/shared/PreferencesDialog";
 import { GlobalSearch } from "./components/shared/GlobalSearch";
 import { ensureLibraryIndexed } from "./lib/ftsSearch";
-import { useUiStore } from "./stores/ui";
+import { useUiStore, SIDEBAR_DEFAULT, TRACKER_DEFAULT } from "./stores/ui";
 import { usePapersStore } from "./stores/papers";
 import { useProjectsStore } from "./stores/projects";
 import { useKeywordsStore } from "./stores/keywords";
@@ -95,6 +95,7 @@ export default function App() {
     const unsubs = [
       onMenuEvent("toggle-sidebar", toggleSidebar),
       onMenuEvent("toggle-tracker", toggleTracker),
+      onMenuEvent("reset-layout", () => useUiStore.getState().resetPanelSizes()),
       onMenuEvent("about", () => setAboutOpen(true)),
       onMenuEvent("shortcuts", () => setShortcutsOpen(true)),
       onMenuEvent("preferences", () => setPreferencesOpen(true)),
@@ -179,8 +180,11 @@ export default function App() {
     const drainPendingPdfs = async () => {
       try {
         const paths = await invoke<string[]>("take_pending_open_files");
+        // Once taken from the Rust queue the paths exist nowhere else, so
+        // they are opened even if this effect instance was cleaned up
+        // meanwhile (StrictMode's double mount, a remount) — import is
+        // idempotent (dedup by path), so a stale opener does no harm.
         for (const path of paths) {
-          if (cancelled) return;
           await importOrOpenPdf(path);
         }
       } catch (e) {
@@ -226,7 +230,11 @@ export default function App() {
           <div style={{ width: sidebarWidth }} className="shrink-0 h-full overflow-hidden">
             <Sidebar />
           </div>
-          <Splitter onResize={onSidebarResize} direction="left" />
+          <Splitter
+            onResize={onSidebarResize}
+            onReset={() => setSidebarWidth(SIDEBAR_DEFAULT)}
+            direction="left"
+          />
         </>
       )}
 
@@ -236,7 +244,11 @@ export default function App() {
 
       {trackerVisible && (
         <>
-          <Splitter onResize={onTrackerResize} direction="right" />
+          <Splitter
+            onResize={onTrackerResize}
+            onReset={() => setTrackerWidth(TRACKER_DEFAULT)}
+            direction="right"
+          />
           <div style={{ width: trackerWidth }} className="shrink-0 h-full overflow-hidden">
             <TrackerPanel />
           </div>

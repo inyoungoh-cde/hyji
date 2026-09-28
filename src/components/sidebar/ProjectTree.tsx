@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useProjectsStore } from "../../stores/projects";
 import { usePapersStore } from "../../stores/papers";
 import { useUiStore } from "../../stores/ui";
 import { useDragReorder } from "../../hooks/useDragReorder";
-import { usePaperDrag, PAPER_DRAG_UNASSIGNED } from "../../hooks/usePaperDrag";
+import { usePaperDrag, PAPER_DRAG_UNASSIGNED, SWIPE_MAX } from "../../hooks/usePaperDrag";
 import { onMenuEvent, emitMenuEvent } from "../../lib/menuEvents";
 import type { Project, Paper } from "../../types";
 
@@ -29,6 +29,21 @@ const statusDot: Record<string, string> = {
   "Fully Reviewed": "text-[#06d6a0]",
   "Revisit Needed": "text-[#ff6b6b]",
 };
+const statusHex: Record<string, string> = {
+  Surveyed: "#ffd166",
+  "Fully Reviewed": "#06d6a0",
+  "Revisit Needed": "#ff6b6b",
+};
+const STATUS_CYCLE: Paper["status"][] = ["Surveyed", "Fully Reviewed", "Revisit Needed"];
+const nextStatus = (s: string): Paper["status"] =>
+  STATUS_CYCLE[(STATUS_CYCLE.indexOf(s as Paper["status"]) + 1) % STATUS_CYCLE.length];
+
+// Swipe geometry (px): the delete button revealed on a left swipe, the
+// travel past which a release commits the action, and the full-swipe point
+// where the delete confirmation opens without a second click.
+const SWIPE_REVEAL = 64;
+const SWIPE_ACT = 72;
+const SWIPE_FULL = SWIPE_MAX - 12;
 
 const UNASSIGNED_TARGET = PAPER_DRAG_UNASSIGNED;
 
@@ -39,6 +54,7 @@ interface ProjectTreeProps {
   selectMode: boolean;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
+  onSetSelection: (ids: Set<string>) => void;
   searchQuery: string;
 }
 
@@ -46,6 +62,9 @@ interface PaperContextMenu {
   x: number;
   y: number;
   paperId: string;
+  /** The paper(s) the menu acts on: the whole selection when the clicked
+   *  paper is part of it, otherwise just the clicked paper. */
+  targetIds: string[];
 }
 
 type FlatRow =
@@ -61,11 +80,12 @@ export function ProjectTree({
   selectMode,
   selectedIds,
   onToggleSelect,
+  onSetSelection,
   searchQuery,
 }: ProjectTreeProps) {
   const { projects, fetchProjects, createProject, renameProject, deleteProject, reorderProjects, setProjectFolder } =
     useProjectsStore();
-  const { papers, fetchPapers, updatePaper, deletePaper } = usePapersStore();
+  const { papers, fetchPapers, updatePaper, deletePapers, movePapers } = usePapersStore();
   const selectedProjectId = useUiStore((s) => s.selectedProjectId);
   const setSelectedProject = useUiStore((s) => s.setSelectedProject);
   const activePaperId = useUiStore((s) => s.activePaperId);
@@ -81,12 +101,28 @@ export function ProjectTree({
   const [editPaperTitle, setEditPaperTitle] = useState("");
   const [paperContextMenu, setPaperContextMenu] = useState<PaperContextMenu | null>(null);
 
+  // Row left swiped open, delete button showing (iOS-list style)
+  const [swipeOpenId, setSwipeOpenId] = useState<string | null>(null);
+
   // Collapse state
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
 
-  // Paper drag (mouse-event based)
-  const { draggingPaperId, paperDropTarget, ghostPos, onPaperMouseDown, onDropZoneEnter } =
-    usePaperDrag(useCallback((paperId, projectId) => updatePaper(paperId, { project_id: projectId }), [updatePaper]));
+  // Selection helpers: the latest selection for stable callbacks, and the
+  // anchor row for Shift+click ranges.
+  const selectedIdsRef = useRef(selectedIds);
+  useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
+  const selectionAnchorRef = useRef<string | null>(null);
+
+  // Paper drag (mouse-event based): vertical = move to folder, horizontal = swipe
+  const { draggingPaperId, paperDropTarget, ghostPos, swipe, onPaperMouseDown, onDropZoneEnter, consumeGestureClick } =
+    usePaperDrag(
+      useCallback((paperId, projectId) => {
+        // Dragging a selected paper carries the whole selection along.
+        const sel = selectedIdsRef.current;
+        movePapers(sel.has(paperId) ? [...sel] : [paperId], projectId);
+      }, [movePapers]),
+      (paperId, dx) => handleSwipeEnd(paperId, dx)
+    );
 
   // Track last sidebar click to resolve F2 target (project vs paper)
   const lastSidebarClickRef = useRef<{ type: "project" | "paper"; id: string } | null>(null);
@@ -147,6 +183,7 @@ export function ProjectTree({
     const handler = () => {
       setProjectContextMenu(null);
       setPaperContextMenu(null);
+      setSwipeOpenId(null);
     };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
@@ -215,27 +252,78 @@ export function ProjectTree({
     e.preventDefault();
     e.stopPropagation();
     setProjectContextMenu(null);
-    setPaperContextMenu({ x: e.clientX, y: e.clientY, paperId });
+    setSwipeOpenId(null);
+    const targetIds = selectedIds.has(paperId) ? [...selectedIds] : [paperId];
+    setPaperContextMenu({ x: e.clientX, y: e.clientY, paperId, targetIds });
   };
 
-  const handleMovePaper = async (paperId: string, projectId: string | null) => {
+  const handleMovePapers = async (ids: string[], projectId: string | null) => {
     setPaperContextMenu(null);
-    await updatePaper(paperId, { project_id: projectId });
+    await movePapers(ids, projectId);
+    if (ids.length > 1) onSetSelection(new Set());
   };
 
-  const handleDeletePaper = async (paperId: string) => {
+  const handleDeletePapers = useCallback(async (ids: string[]) => {
     setPaperContextMenu(null);
-    const paper = papers.find((p) => p.id === paperId);
+    const targets = ids
+      .map((id) => papers.find((p) => p.id === id))
+      .filter((p): p is Paper => !!p);
+    if (targets.length === 0) return;
     const { ask } = await import("@tauri-apps/plugin-dialog");
+    const one = targets.length === 1;
+    const list = targets.slice(0, 5).map((p) => `• ${p.title}`).join("\n")
+      + (targets.length > 5 ? `\n… and ${targets.length - 5} more` : "");
     const confirmed = await ask(
-      `Delete "${paper?.title ?? "this paper"}"?\n\nAll notes, highlights, and memos will be permanently removed. The PDF file itself will not be deleted.\n\nThis cannot be undone.`,
-      { title: "Delete Paper", kind: "warning" }
+      one
+        ? `Delete "${targets[0].title}"?\n\nAll notes, highlights, and memos will be permanently removed. The PDF file itself will not be deleted.\n\nThis cannot be undone.`
+        : `Delete ${targets.length} papers?\n\n${list}\n\nAll their notes, highlights, and memos will be permanently removed. The PDF files themselves will not be deleted.\n\nThis cannot be undone.`,
+      { title: one ? "Delete Paper" : `Delete ${targets.length} Papers`, kind: "warning" }
     );
     if (!confirmed) return;
-    useUiStore.getState().closePaperTab(paperId);
-    await deletePaper(paperId);
+    const ui = useUiStore.getState();
+    for (const p of targets) ui.closePaperTab(p.id);
+    await deletePapers(targets.map((p) => p.id));
+    onSetSelection(new Set());
+  }, [papers, deletePapers, onSetSelection]);
+
+  // Swipe release: far left → delete (confirmation opens directly); part way
+  // left → leave the delete button showing; right → advance reading status.
+  const handleSwipeEnd = (paperId: string, dx: number) => {
+    if (dx <= -SWIPE_FULL) {
+      setSwipeOpenId(null);
+      handleDeletePapers([paperId]);
+      return;
+    }
+    if (dx <= -SWIPE_REVEAL * 0.6) {
+      setSwipeOpenId(paperId);
+      return;
+    }
+    setSwipeOpenId(null);
+    if (dx >= SWIPE_ACT) {
+      const paper = papers.find((p) => p.id === paperId);
+      if (paper) updatePaper(paper.id, { status: nextStatus(paper.status) });
+    }
   };
 
+  // Delete removes the multi-selection; Escape clears it (select-mode's own
+  // Escape lives in Sidebar) and closes a swiped-open row.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+      if (e.key === "Escape") {
+        if (swipeOpenId) setSwipeOpenId(null);
+        if (!selectMode && !typing && selectedIds.size > 0) onSetSelection(new Set());
+        return;
+      }
+      if (e.key === "Delete" && !typing && selectedIds.size > 0) {
+        e.preventDefault();
+        handleDeletePapers([...selectedIds]);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [selectedIds, selectMode, swipeOpenId, onSetSelection, handleDeletePapers]);
 
   // ── Collapse ──
 
@@ -265,76 +353,6 @@ export function ProjectTree({
       sortBy
     );
   }, [statusFilter, importanceFilter, sortBy, searchQuery]);
-
-  // ── Paper item renderer ──
-
-  const renderPaperItem = (paper: Paper, indent = 28) => {
-    const isActive = activePaperId === paper.id;
-    const isSelected = selectedIds.has(paper.id);
-    const isEditingThis = editingPaperId === paper.id;
-    const isDraggingThis = draggingPaperId === paper.id;
-    const dotColor = statusDot[paper.status] ?? "text-text-tertiary";
-
-    return (
-      <div
-        onMouseDown={(e) => !selectMode && !isEditingThis && onPaperMouseDown(e, paper.id)}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (isEditingThis) return;
-          if (selectMode) onToggleSelect(paper.id);
-          else {
-            setActivePaper(paper.id);
-            lastSidebarClickRef.current = { type: "paper", id: paper.id };
-          }
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          if (!selectMode) startPaperRename(paper);
-        }}
-        onContextMenu={(e) => !selectMode && handlePaperContextMenu(e, paper.id)}
-        className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors duration-150 select-none ${
-          isDraggingThis
-            ? "opacity-40"
-            : isSelected
-              ? "bg-accent/10 text-accent"
-              : isActive && !selectMode
-                ? "bg-bg-tertiary text-text-primary"
-                : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
-        }`}
-        style={{ paddingLeft: `${indent}px` }}
-        title={paper.title}
-      >
-        {selectMode ? (
-          <div className={`w-3.5 h-3.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-            isSelected ? "bg-accent border-accent" : "border-border bg-bg-tertiary"
-          }`}>
-            {isSelected && <span className="text-nano text-bg-primary font-bold leading-none">✓</span>}
-          </div>
-        ) : (
-          <span className="text-small flex-shrink-0">📄</span>
-        )}
-
-        {isEditingThis ? (
-          <input
-            ref={paperInputRef}
-            value={editPaperTitle}
-            onChange={(e) => setEditPaperTitle(e.target.value)}
-            onBlur={commitPaperRename}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.stopPropagation(); commitPaperRename(); }
-              if (e.key === "Escape") { e.stopPropagation(); setEditingPaperId(null); }
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className="bg-bg-tertiary text-text-primary text-body border border-accent rounded px-1 py-0 outline-none flex-1 min-w-0 selectable"
-          />
-        ) : (
-          <span className="truncate text-body flex-1 min-w-0">{paper.title}</span>
-        )}
-
-        <span className={`text-nano flex-shrink-0 ${dotColor}`}>●</span>
-      </div>
-    );
-  };
 
   // (Project rendering is now handled inline via flatRows virtualization)
 
@@ -397,6 +415,144 @@ export function ProjectTree({
     getFilteredPapers,
   ]);
 
+  // Visible paper order — what Shift+click ranges span.
+  const visiblePaperIds = useMemo(
+    () => flatRows.flatMap((r) => (r.kind === "paper" ? [r.paper.id] : [])),
+    [flatRows]
+  );
+
+  const selectRange = (toId: string) => {
+    const anchor = selectionAnchorRef.current ?? activePaperId;
+    const a = anchor ? visiblePaperIds.indexOf(anchor) : -1;
+    const b = visiblePaperIds.indexOf(toId);
+    if (a === -1 || b === -1) {
+      onSetSelection(new Set([toId]));
+      selectionAnchorRef.current = toId;
+      return;
+    }
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    onSetSelection(new Set(visiblePaperIds.slice(lo, hi + 1)));
+  };
+
+  // ── Paper item renderer ──
+
+  const renderPaperItem = (paper: Paper, indent = 28) => {
+    const isActive = activePaperId === paper.id;
+    const isSelected = selectedIds.has(paper.id);
+    const isEditingThis = editingPaperId === paper.id;
+    const isDraggingThis = draggingPaperId === paper.id;
+    const dotColor = statusDot[paper.status] ?? "text-text-tertiary";
+
+    const isSwiping = swipe?.paperId === paper.id;
+    const swipeDx = isSwiping ? swipe.dx : swipeOpenId === paper.id ? -SWIPE_REVEAL : 0;
+    const next = nextStatus(paper.status);
+    const nextHex = statusHex[next];
+
+    return (
+      <div className="relative overflow-hidden rounded">
+        {/* Revealed under the row while it is swiped */}
+        {swipeDx < 0 && (
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 flex items-center justify-center gap-1 bg-status-revisit text-white text-caption font-bold"
+            style={{ width: SWIPE_REVEAL, opacity: Math.min(1, -swipeDx / SWIPE_REVEAL) }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setSwipeOpenId(null); handleDeletePapers([paper.id]); }}
+            title="Delete paper"
+          >
+            🗑 Delete
+          </button>
+        )}
+        {swipeDx > 0 && (
+          <div
+            className="absolute inset-y-0 left-0 flex items-center pl-2 text-caption font-bold whitespace-nowrap"
+            style={{
+              width: SWIPE_MAX + 8,
+              background: `${nextHex}33`,
+              color: nextHex,
+              opacity: Math.min(1, swipeDx / SWIPE_ACT),
+            }}
+          >
+            → {next}
+          </div>
+        )}
+
+        <div
+          onMouseDown={(e) => !selectMode && !isEditingThis && onPaperMouseDown(e, paper.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isEditingThis) return;
+            if (consumeGestureClick()) return;
+            if (swipeOpenId) { setSwipeOpenId(null); return; }
+            if (selectMode) { onToggleSelect(paper.id); return; }
+            if (e.ctrlKey || e.metaKey) {
+              onToggleSelect(paper.id);
+              selectionAnchorRef.current = paper.id;
+              return;
+            }
+            if (e.shiftKey) { selectRange(paper.id); return; }
+            if (selectedIds.size > 0) onSetSelection(new Set());
+            selectionAnchorRef.current = paper.id;
+            setActivePaper(paper.id);
+            lastSidebarClickRef.current = { type: "paper", id: paper.id };
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (!selectMode && !e.ctrlKey && !e.shiftKey) startPaperRename(paper);
+          }}
+          onContextMenu={(e) => !selectMode && handlePaperContextMenu(e, paper.id)}
+          className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer select-none ${
+            isSwiping ? "" : "transition-[background-color,color,transform] duration-150"
+          } ${
+            isDraggingThis
+              ? "opacity-40"
+              : isSelected
+                ? "bg-accent/10 text-accent"
+                : isActive && !selectMode
+                  ? "bg-bg-tertiary text-text-primary"
+                  : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+          }`}
+          style={{
+            paddingLeft: `${indent}px`,
+            transform: swipeDx ? `translateX(${swipeDx}px)` : undefined,
+            // A translated row must cover the strip it slides over
+            backgroundColor: swipeDx ? "var(--bg-secondary)" : undefined,
+          }}
+          title={paper.title}
+        >
+          {selectMode ? (
+            <div className={`w-3.5 h-3.5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+              isSelected ? "bg-accent border-accent" : "border-border bg-bg-tertiary"
+            }`}>
+              {isSelected && <span className="text-nano text-bg-primary font-bold leading-none">✓</span>}
+            </div>
+          ) : (
+            <span className="text-small flex-shrink-0">📄</span>
+          )}
+
+          {isEditingThis ? (
+            <input
+              ref={paperInputRef}
+              value={editPaperTitle}
+              onChange={(e) => setEditPaperTitle(e.target.value)}
+              onBlur={commitPaperRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.stopPropagation(); commitPaperRename(); }
+                if (e.key === "Escape") { e.stopPropagation(); setEditingPaperId(null); }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-bg-tertiary text-text-primary text-body border border-accent rounded px-1 py-0 outline-none flex-1 min-w-0 selectable"
+            />
+          ) : (
+            <span className="truncate text-body flex-1 min-w-0">{paper.title}</span>
+          )}
+
+          <span className={`text-nano flex-shrink-0 ${dotColor}`}>●</span>
+        </div>
+      </div>
+    );
+  };
+
   // ── Virtual scroller ──
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -406,6 +562,17 @@ export function ProjectTree({
     estimateSize: () => 28,
     overscan: 8,
   });
+
+  const menuTargets = paperContextMenu?.targetIds ?? [];
+  const menuTargetPapers = menuTargets
+    .map((id) => papers.find((p) => p.id === id))
+    .filter((p): p is Paper => !!p);
+  // Folder the targets already live in (only when they all share one) —
+  // shown as the current location and not offered as a destination.
+  const menuCurrentProject = menuTargetPapers.length > 0
+    && menuTargetPapers.every((p) => p.project_id === menuTargetPapers[0].project_id)
+    ? menuTargetPapers[0].project_id
+    : undefined;
 
   return (
     <div className="flex flex-col h-full">
@@ -444,7 +611,7 @@ export function ProjectTree({
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto px-1"
         onContextMenu={(e) => handleProjectContextMenu(e, null)}
-        onClick={() => { setProjectContextMenu(null); setPaperContextMenu(null); }}
+        onClick={() => { setProjectContextMenu(null); setPaperContextMenu(null); setSwipeOpenId(null); }}
       >
         <div
           style={{ height: `${virtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}
@@ -613,51 +780,131 @@ export function ProjectTree({
       )}
 
       {/* Paper drag ghost */}
-      {ghostPos && draggingPaperId && (
-        <div
-          className="fixed z-[9999] pointer-events-none bg-bg-secondary border border-accent/60 rounded px-2 py-1 text-body text-text-primary opacity-80 max-w-[200px] truncate shadow-lg"
-          style={{ left: ghostPos.x, top: ghostPos.y }}
-        >
-          📄 {papers.find((p) => p.id === draggingPaperId)?.title ?? ""}
-        </div>
-      )}
+      {ghostPos && draggingPaperId && (() => {
+        const n = selectedIds.has(draggingPaperId) ? selectedIds.size : 1;
+        return (
+          <div
+            className="fixed z-[9999] pointer-events-none bg-bg-secondary border border-accent/60 rounded px-2 py-1 text-body text-text-primary opacity-80 max-w-[200px] truncate shadow-lg"
+            style={{ left: ghostPos.x, top: ghostPos.y }}
+          >
+            📄 {n > 1 ? `${n} papers` : (papers.find((p) => p.id === draggingPaperId)?.title ?? "")}
+          </div>
+        );
+      })()}
 
       {/* Paper context menu */}
       {paperContextMenu && (
         <ClampedMenu
           x={paperContextMenu.x}
           y={paperContextMenu.y}
-          className="fixed z-50 bg-bg-secondary border border-border rounded-[8px] py-1 shadow-lg min-w-[180px]"
+          className="fixed z-50 bg-bg-secondary border border-border rounded-[8px] py-1 shadow-lg min-w-[200px] max-w-[300px]"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-1 text-caption font-bold uppercase tracking-wider text-text-tertiary">
-            Move to
+            {menuTargets.length > 1 ? `Move ${menuTargets.length} papers to` : "Move to"}
           </div>
-          <button className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-text-secondary transition-colors"
-            onClick={() => handleMovePaper(paperContextMenu.paperId, null)}>
-            — Unassigned
-          </button>
-          {projects.map((proj) => (
-            <button
-              key={proj.id}
-              className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-text-primary transition-colors"
-              style={{ paddingLeft: proj.parent_id ? "28px" : "12px" }}
-              onClick={() => handleMovePaper(paperContextMenu.paperId, proj.id)}
-            >
-              📁 {proj.name}
-            </button>
-          ))}
+          <MoveTarget
+            label="Unassigned"
+            icon="—"
+            depth={0}
+            isCurrent={menuCurrentProject === null}
+            onPick={() => handleMovePapers(menuTargets, null)}
+          />
+          <MoveTree
+            projects={projects}
+            parentId={null}
+            depth={0}
+            currentProjectId={menuCurrentProject}
+            onPick={(id) => handleMovePapers(menuTargets, id)}
+          />
           <div className="border-t border-border my-1" />
-          <button className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-text-primary transition-colors"
-            onClick={() => { const p = papers.find((p) => p.id === paperContextMenu.paperId); if (p) startPaperRename(p); }}>
-            Rename
-          </button>
+          {menuTargets.length === 1 && (
+            <button className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-text-primary transition-colors"
+              onClick={() => { const p = papers.find((p) => p.id === paperContextMenu.paperId); if (p) startPaperRename(p); }}>
+              Rename
+            </button>
+          )}
           <button className="w-full text-left px-3 py-1.5 text-body hover:bg-bg-tertiary text-status-revisit transition-colors"
-            onClick={() => handleDeletePaper(paperContextMenu.paperId)}>
-            Delete Paper
+            onClick={() => handleDeletePapers(menuTargets)}>
+            {menuTargets.length > 1 ? `Delete ${menuTargets.length} Papers` : "Delete Paper"}
           </button>
         </ClampedMenu>
       )}
+    </div>
+  );
+}
+
+// ── Move-to folder tree ──────────────────────────────────────────────────────
+// Mirrors the sidebar's folder hierarchy: each nesting level is indented and
+// hangs off a guide line, so "KIST ▸ RFP ▸ paper" reads as a path at a glance.
+
+function MoveTarget({
+  label,
+  icon,
+  depth,
+  isCurrent,
+  onPick,
+}: {
+  label: string;
+  icon: string;
+  depth: number;
+  isCurrent: boolean;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      disabled={isCurrent}
+      onClick={onPick}
+      className={`w-full text-left pr-3 py-1 flex items-center gap-1.5 text-body transition-colors ${
+        isCurrent
+          ? "text-text-tertiary cursor-default"
+          : "text-text-primary hover:bg-bg-tertiary"
+      }`}
+      style={{ paddingLeft: depth === 0 ? 12 : 8 }}
+      title={isCurrent ? "Current folder" : undefined}
+    >
+      <span className={`flex-shrink-0 ${icon === "—" ? "text-text-tertiary w-3 text-center" : "text-small"}`}>{icon}</span>
+      <span className="truncate flex-1 min-w-0">{label}</span>
+      {isCurrent && <span className="text-caption text-text-tertiary flex-shrink-0">current</span>}
+    </button>
+  );
+}
+
+function MoveTree({
+  projects,
+  parentId,
+  depth,
+  currentProjectId,
+  onPick,
+}: {
+  projects: Project[];
+  parentId: string | null;
+  depth: number;
+  currentProjectId: string | null | undefined;
+  onPick: (projectId: string) => void;
+}) {
+  const children = projects.filter((p) => p.parent_id === parentId);
+  if (children.length === 0) return null;
+  return (
+    <div className={depth > 0 ? "ml-[18px] border-l border-border/70" : ""}>
+      {children.map((p) => (
+        <Fragment key={p.id}>
+          <MoveTarget
+            label={p.name}
+            icon="📁"
+            depth={depth}
+            isCurrent={currentProjectId === p.id}
+            onPick={() => onPick(p.id)}
+          />
+          <MoveTree
+            projects={projects}
+            parentId={p.id}
+            depth={depth + 1}
+            currentProjectId={currentProjectId}
+            onPick={onPick}
+          />
+        </Fragment>
+      ))}
     </div>
   );
 }

@@ -1,16 +1,10 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { readFile } from "@tauri-apps/plugin-fs";
 import { HighlightLayer } from "./HighlightLayer";
-import { PDFJS_ASSET_OPTIONS } from "../../lib/pdfjsAssets";
+import { openPdfDocument } from "../../lib/pdfSource";
 import { useUiStore } from "../../stores/ui";
 import type { Annotation } from "../../types";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.mjs",
-  import.meta.url
-).toString();
 
 export interface PdfRect {
   x: number;
@@ -234,14 +228,9 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
 
     (async () => {
       try {
-        // Read file via Tauri FS plugin
-        const bytes = await readFile(filePath);
-        if (cancelled) return;
-
-        const pdfDoc = await pdfjsLib.getDocument({
-          data: bytes,
-          ...PDFJS_ASSET_OPTIONS,
-        }).promise;
+        // Whole-file read for normal papers; ranged on-demand loading for
+        // large files (see lib/pdfSource.ts).
+        const pdfDoc = await openPdfDocument(filePath);
         if (cancelled) {
           pdfDoc.destroy().catch(() => undefined);
           return;

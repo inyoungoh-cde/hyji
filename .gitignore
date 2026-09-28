@@ -9,3 +9,8 @@ public/pdfjs/
 # Internal docs — kept local, not published
 CLAUDE.md
 doc/
+
+# Local test assets
+check/
+pic/
+videos/

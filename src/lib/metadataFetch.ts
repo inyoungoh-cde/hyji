@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import * as pdfjsLib from "pdfjs-dist";
-import { readFile } from "@tauri-apps/plugin-fs";
-import { PDFJS_ASSET_OPTIONS } from "./pdfjsAssets";
+import { openPdfDocument } from "./pdfSource";
+import { getBgPdfWorker } from "./pdfBgWorker";
 import { normalizeVenue } from "./venueMap";
 import { useNetworkStore } from "../stores/network";
 import type { Paper, RefType } from "../types";
@@ -59,8 +58,7 @@ function cleanDoi(raw: string): string {
 
 /** Pull a DOI / arXiv id from the first two pages of the paper's PDF. */
 export async function extractIdentifiersFromPdf(pdfPath: string): Promise<Identifiers> {
-  const bytes = await readFile(pdfPath);
-  const doc = await pdfjsLib.getDocument({ data: bytes, ...PDFJS_ASSET_OPTIONS }).promise;
+  const doc = await openPdfDocument(pdfPath, { worker: getBgPdfWorker() });
   let text = "";
   try {
     const pages = Math.min(2, doc.numPages);

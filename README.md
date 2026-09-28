@@ -176,6 +176,11 @@ Please keep PRs focused — one feature or fix per PR.
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
 
+### v2.7 (Sep 2026)
+- Large PDFs (100+ MB proceedings volumes) open in under a second instead of several seconds, without gigabyte memory spikes — files over 20 MB are streamed to the viewer by ranges on demand
+- Sidebar: Ctrl/Shift multi-select with bulk move/delete, a folder-tree "Move to" menu, and swipe gestures on paper rows (left = delete, right = advance status)
+- View → Reset Panel Sizes; double-click a splitter to reset that panel
+
 ### v2.6 (Aug 2026)
 - Fixed papers becoming slower to open the longer the app ran — and sometimes never loading at all: PDFs are now released from worker memory on tab switch/close, only the pages near the viewport are rendered (bounded canvas memory on long documents), and library indexing runs on its own background worker so it never blocks opening a paper
 

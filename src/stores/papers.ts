@@ -10,8 +10,13 @@ interface PapersState {
   createPaper: (title: string, projectId?: string | null, pdfPath?: string, pdfStorage?: "copy" | "link") => Promise<Paper>;
   updatePaper: (id: string, fields: Partial<Paper>) => Promise<void>;
   deletePaper: (id: string) => Promise<void>;
+  /** Bulk variants: one statement + one refetch for a multi-selection. */
+  deletePapers: (ids: string[]) => Promise<void>;
+  movePapers: (ids: string[], projectId: string | null) => Promise<void>;
   reorderPapers: (orderedIds: string[]) => Promise<void>;
 }
+
+const placeholders = (n: number) => Array.from({ length: n }, () => "?").join(", ");
 
 export const usePapersStore = create<PapersState>((set, get) => ({
   papers: [],
@@ -69,12 +74,26 @@ export const usePapersStore = create<PapersState>((set, get) => ({
     markDbDirty();
   },
 
-  deletePaper: async (id) => {
+  deletePaper: (id) => get().deletePapers([id]),
+
+  deletePapers: async (ids) => {
+    if (ids.length === 0) return;
     const db = await getDb();
-    await db.execute("DELETE FROM papers WHERE id = ?", [id]);
+    await db.execute(`DELETE FROM papers WHERE id IN (${placeholders(ids.length)})`, ids);
     // Full-text index rows aren't covered by FK cascades (virtual table)
     const { deletePaperIndex } = await import("../lib/ftsSearch");
-    await deletePaperIndex(id).catch(() => undefined);
+    for (const id of ids) await deletePaperIndex(id).catch(() => undefined);
+    await get().fetchPapers();
+    markDbDirty();
+  },
+
+  movePapers: async (ids, projectId) => {
+    if (ids.length === 0) return;
+    const db = await getDb();
+    await db.execute(
+      `UPDATE papers SET project_id = ?, updated_at = datetime('now') WHERE id IN (${placeholders(ids.length)})`,
+      [projectId, ...ids]
+    );
     await get().fetchPapers();
     markDbDirty();
   },

@@ -131,6 +131,46 @@ pub async fn delete_paper(id: String) -> Result<(), String> {
     Ok(())
 }
 
+// ── PDF byte access ──
+//
+// pdf.js can load a document by ranges (PDFDataRangeTransport). For large
+// files — proceedings volumes, scanned books — that avoids pushing hundreds of
+// MB through the IPC bridge (and through several JS heap copies) on every
+// open; only the chunks pdf.js actually needs travel. Small files still go
+// through plugin-fs readFile in one round trip.
+
+#[tauri::command]
+pub fn file_size(path: String) -> Result<u64, String> {
+    std::fs::metadata(&path)
+        .map(|m| m.len())
+        .map_err(|e| format!("{path}: {e}"))
+}
+
+#[tauri::command]
+pub fn read_file_range(
+    path: String,
+    offset: u64,
+    length: usize,
+) -> Result<tauri::ipc::Response, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(&path).map_err(|e| format!("{path}: {e}"))?;
+    f.seek(SeekFrom::Start(offset))
+        .map_err(|e| format!("{path}: seek {offset}: {e}"))?;
+    let mut buf = vec![0u8; length];
+    let mut filled = 0;
+    while filled < length {
+        let n = f
+            .read(&mut buf[filled..])
+            .map_err(|e| format!("{path}: read: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        filled += n;
+    }
+    buf.truncate(filled);
+    Ok(tauri::ipc::Response::new(buf))
+}
+
 /// Fetch text from an allowlisted metadata API. Runs in Rust because the
 /// WebView enforces CORS (arXiv's API sends no CORS headers) and because a
 /// proper User-Agent (Crossref "polite pool") must be attached.
