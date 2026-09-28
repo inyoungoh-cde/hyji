@@ -106,9 +106,10 @@ interface UiState {
   /** Stem-darkening strength for PDF text on standard-DPI displays (0 = off).
    *  Compensates for pdf.js's unhinted antialiasing looking thin vs Acrobat. */
   pdfTextDarkening: number;
-  /** Same pass for the PDFium engine. PDFium's hinted glyphs are already
-   *  uniform, so a much lighter touch matches Edge/Acrobat weight (measured:
-   *  0.35 → mean ink luminance 91.8 vs Edge 93.5; 0.65 would over-darken). */
+  /** Same pass for the PDFium engine. Default OFF (3.1): PDFium's hinted
+   *  glyphs are already uniform (stems 43/46 % at 1/2 px, Edge 50/41 %), and
+   *  the multiply pass smears 1-px stems into 2-px (25/56 %) — the softness
+   *  users read as blur. Subtle/Standard remain for anyone who wants weight. */
   pdfiumTextDarkening: number;
   /** Page rasterizer (v3.0): "pdfium" = hinted glyphs via the bundled PDFium
    *  DLL (falls back to pdf.js when the DLL is unavailable); "pdfjs" = the
@@ -197,7 +198,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   textSize: loadTextSize(),
   pdfDarkMode: loadBool("hyji:pdf-dark", false),
   pdfTextDarkening: loadDarkening("hyji:pdf-text-darkening", 0.65),
-  pdfiumTextDarkening: loadDarkening("hyji:pdfium-text-darkening", 0.35),
+  pdfiumTextDarkening: loadDarkening("hyji:pdfium-text-darkening", 0),
   pdfRenderEngine: loadPdfRenderEngine(),
   focusMode: false,
   preFocusState: null,

@@ -376,8 +376,15 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       const renderViewport = page.getViewport({ scale: scale * dpr });
       canvas.width = Math.floor(renderViewport.width);
       canvas.height = Math.floor(renderViewport.height);
-      canvas.style.width = `${viewport.width}px`;
-      canvas.style.height = `${viewport.height}px`;
+      // Pixel-exact display: the CSS box must map 1:1 onto the backing store
+      // (backing / dpr, not the fractional viewport size) and sampling must
+      // be nearest-neighbour. Otherwise the compositor bilinear-resamples
+      // the bitmap by a fraction of a pixel — invisible with pdf.js's soft
+      // antialiasing, but it turned PDFium's hinted 1-px stems into gray
+      // smears (measured: sharpness 0.69× the reference in 3.0).
+      canvas.style.width = `${canvas.width / dpr}px`;
+      canvas.style.height = `${canvas.height / dpr}px`;
+      canvas.style.imageRendering = "pixelated";
       canvas.style.display = "block";
       container.appendChild(canvas);
 

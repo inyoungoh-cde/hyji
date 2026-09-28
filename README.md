@@ -209,6 +209,10 @@ Please keep PRs focused — one feature or fix per PR.
 
 > Releases before 2.0 were renumbered to a two-part scheme (`1.0.x` → `1.x`, `0.1.x` → `0.(x+1)`). Original git tags are unchanged — see [CHANGELOG.md](./CHANGELOG.md) for the mapping.
 
+### v3.1 (Sep 2026)
+- Fixed 3.0 text looking soft: the page bitmap was resampled by a fraction of a pixel by the compositor; it is now displayed pixel-exact (portrait Focus Mode now matches the engine's own render 1:1)
+- PDFium stem darkening defaults to Off (crispest, Edge-like); Subtle / Standard / Strong remain selectable
+
 ### v3.0 (Sep 2026)
 - New page renderer: PDFium (Chrome/Edge's engine) replaces pdf.js rasterization — hinted, uniform strokes on standard-DPI monitors, which fixes the grainy/smeared text when reading in Focus Mode on a 100 %-scale portrait display; text selection, links, search and annotations stay on pdf.js
 - Verified against pdf.js with a new render-integrity harness (`tools/render-verify/`): 110 pages across 12 real papers and synthetic rotation / CropBox / annotation / scanned / mixed-size fixtures — nothing pdf.js drew is missing (≤ 0.002 % ink), identical pixel sizes

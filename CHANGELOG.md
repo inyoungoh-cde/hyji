@@ -7,6 +7,13 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [3.1] - 2026-09-28
+
+### Fixed
+
+- **3.0 text looked soft — blurrier than the engine actually drew.** The PDFium bitmap was displayed through a CSS box sized to the fractional page width (e.g. 1077.12 px) and positioned on fractional device pixels, so the compositor bilinear-resampled every page by a fraction of a pixel. pdf.js's soft antialiasing hid that; PDFium's hinted 1-px stems turned into gray smears. Measured against a reference render at the same page width, the displayed text's edge sharpness was 0.76× (portrait monitor, Focus Mode) and 0.84× (125 % monitor, fit width) of what PDFium produced. The canvas is now sized exactly to its backing store (`backing / devicePixelRatio`) and drawn with nearest-neighbour sampling; the same scenes now measure **1.00×** and **0.96×**, and the portrait Focus Mode capture is pixel-for-pixel the reference render.
+- **PDFium stem darkening now defaults to Off.** With hinted glyphs the multiply pass mostly turned 1-px stems into 2-px ones (42 / 46 % → 25 / 56 % at 1 / 2 px) — heavier, but read as blur. Off is the crispest and matches Edge's viewer; Subtle / Standard / Strong stay available in Preferences → PDF text rendering. (pdf.js's own setting is unchanged.)
+
 ## [3.0] - 2026-09-28
 
 ### Changed

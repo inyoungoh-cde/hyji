@@ -44,9 +44,9 @@ const DARKENING_OPTIONS: { value: number; label: string; hint: string }[] = [
 // PDFium already hints glyphs, so the same pass needs a lighter hand: 0.35
 // lands on Edge/Acrobat ink density (measured), 0.65 would look bold.
 const PDFIUM_DARKENING_OPTIONS: { value: number; label: string; hint: string }[] = [
-  { value: 0, label: "Off", hint: "PDFium's native rendering — same as Edge's viewer, slightly lighter than Acrobat" },
+  { value: 0, label: "Off", hint: "PDFium's native hinted rendering — crispest, same as Edge's viewer (recommended)" },
   { value: 0.2, label: "Subtle", hint: "A touch more ink" },
-  { value: 0.35, label: "Standard", hint: "Acrobat-like stroke weight (recommended)" },
+  { value: 0.35, label: "Standard", hint: "Acrobat-like ink density; stems get visibly heavier" },
   { value: 0.5, label: "Strong", hint: "Boldest — for low-contrast displays" },
 ];
 
