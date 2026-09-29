@@ -19,7 +19,7 @@
 
 ## What is HYJI?
 
-HYJI (pronounced *hai-jee*) is a desktop app built for researchers who spend serious time in PDFs. It combines a PDF reader (rendered by PDFium, the engine inside Chrome and Edge), a highlight/annotation tool, a structured note-taking panel, and a project management layer — all in one window, all stored locally.
+HYJI (pronounced *hai-jee*) is a desktop app built for researchers who spend serious time in PDFs. It combines a PDF reader (powered by PDFium, the engine inside Chrome and Edge), a highlight/annotation tool, a structured note-taking panel, and a project management layer — all in one window, all stored locally.
 
 No cloud. No subscriptions. No AI fluff. Just you and your papers.
 
@@ -37,6 +37,8 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Keyword graph, zero setup** — Import papers and their keywords are auto-extracted from PDF metadata. A force-directed graph in the sidebar shows how your papers connect. Click a node to filter. No manual tagging required.
 
+- **See what [47] is without losing your place** — Hover an in-text citation and a card shows the referenced paper — first author et al., title, venue abbreviation (ECCV, CVPR, TPAMI…) and year. You choose which fields appear; clicking still jumps to the bibliography with a *Back to reading* button.
+
 - **Reads like a real PDF viewer** — Pages are rasterized by PDFium with hinted, pixel-exact text, so a paper is as sharp in Focus Mode on a 100 %-scale portrait monitor as it is in Edge or Acrobat. Dark mode inverts the page but keeps figures in their true colors.
 
 - **One-glance triage** — Every paper carries a level (★ Noted · ★★ Relevant · ★★★ Core) and an optional ⚑ Revisit flag. The same stars and flag appear on sidebar rows, filter chips, the viewer toolbar and the dashboard, so you never need a legend — and a swipe on a row sets the flag.
@@ -47,13 +49,13 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 ### Reading
 
-- **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, fit width — papers open fitted by default, Tools → Auto Fit Width on Open), clickable hyperlinks and internal reference links with a "Back to reading" button, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK fonts).
-- **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in under a second: files over 20 MB are streamed to the viewer by ranges on demand instead of being read whole.
-- **Hinted, pixel-exact text on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge) and displayed 1:1 on device pixels; since 3.2 the text layer, selection boxes, links and search come from the same engine, so highlights land exactly on the glyphs. It is displayed so stroke weight is uniform and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling. Preferences → *PDF render engine* switches to the classic pdf.js renderer if a document ever needs it (the app also falls back automatically when the PDFium library is unavailable), and *PDF text rendering* adds optional stem darkening per engine (Off / Subtle / Standard / Strong — PDFium defaults to Off, the crispest).
-- **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors.
-- **Citation preview on hover** — Rest the pointer on a citation like [47] to see the paper it refers to (first author et al., title, abbreviated venue such as ECCV, year) without leaving the page; View → Citation Preview on Hover picks the fields. Click still jumps to the reference with *Back to reading*.
+- **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, Ctrl+= / Ctrl+-, fit width), Focus Mode (Ctrl+L) for distraction-free reading. Papers open fitted to the window by default (Tools → Auto Fit Width on Open; uncheck it to open at 100 %). Clickable web links and internal links to references, figures and sections, with a *Back to reading* button to return. Korean/Japanese/Chinese PDFs render, select and search correctly.
+- **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in well under a second: PDFium reads only the parts of the file it needs, so a 736-page, 260 MB volume opens with about 65 MB of app memory, and any zoom level renders.
+- **Hinted, pixel-exact text on every monitor** — PDFium draws the pages with font hinting and HYJI puts them on screen 1:1 on device pixels, so stroke weight is uniform and Focus Mode on a 100 %-scale portrait monitor reads like Edge or Acrobat. Text selection, highlights, links and search use the same engine, so highlights land exactly on the glyphs. Pages re-render when the window moves between monitors with different scaling. Preferences → *PDF render engine* can switch to the classic pdf.js renderer for a document that needs it (also the automatic fallback), and *PDF text rendering* adds optional stroke darkening (Off by default — the crispest).
+- **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors; citation cards switch to a light palette to stay readable.
+- **Citation preview on hover** — Rest the pointer on a citation like [47] to see the paper it refers to: `[47] Tang et al.` · **Contrastive boundary learning for point cloud segmentation** · `CVPR` 2022. View → Citation Preview on Hover turns each field (authors, title, venue, year) on or off. Works with numbered and author-year reference styles, including two-column bibliographies and entries that continue onto the next column or page; links to figures, tables and sections show their caption or heading. Needs a PDF whose citations are real links (virtually all LaTeX papers).
 - **Multi-tab reading** — Several papers in browser-style tabs; each tab remembers its zoom and reading position, and open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a tab in the running app.
-- **Print** (Ctrl+P) — High-resolution print with your highlights, underlines and memos burned in, rendered by the same engine as the screen.
+- **Print** (Ctrl+P) — High-resolution print with your highlights, underlines, strikeouts and memos in their colors, rendered by the same engine as the screen.
 
 ### Annotating & note-taking
 
@@ -75,23 +77,24 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **Smart Paste** (Ctrl+N) — Paste BibTeX, a citation string, an arXiv ID or RIS; the format is auto-detected and every field parsed. Reference types (article / conference / book / chapter / thesis / misc) with publisher, edition, chapter, pages, DOI.
 - **Fetch metadata** — One click looks the paper up on Crossref/arXiv from its DOI or arXiv ID (auto-detected in the PDF) with a confirm-before-overwrite diff. Strictly user-initiated — see [Privacy & Network Policy](#privacy--network-policy).
-- **Export dialog** — LaTeX `.bib` / RIS / Word / CSV / clipboard; citation style (IEEE / ACS / Nature / APA / MLA); journal-name format (full / abbreviated, 247-entry ISO 4 / CASSI map); starting number; live preview. Raw pasted BibTeX is exported verbatim.
+- **Export dialog** — LaTeX `.bib` / RIS / Word / CSV / clipboard; citation style (IEEE / ACS / Nature / APA / MLA); journal-name format (full / abbreviated, 302-venue ISO 4 / CASSI map with common aliases — shared with the citation preview); starting number; live preview. Raw pasted BibTeX is exported verbatim.
 - **Full-text search** (Ctrl+Shift+F) — One overlay searches metadata, your notes *and* the text inside every PDF (Korean and English), with page-level hits that jump straight to the match; Ctrl+F scopes it to the open document.
 
 ### Workspace
 
 - **Three resizable panels** — Sidebar · viewer · tracker with draggable splitters; View → Reset Panel Sizes (or double-click a splitter) restores the defaults. Startup layout preference: research hub or viewer-only.
 - **Auto-backup** — Backup folder, interval, only-on-change and keep-last-N rotation in Preferences; a final backup on exit if anything changed.
+- **In-app updates** — Help → Check for Updates… shows what's new and installs the next version in place; an automatic check at launch is available but off by default.
 - **100% local** — SQLite database on your disk. No account, no cloud, no tracking. Works offline forever — and an **Offline mode** switch in Preferences guarantees it.
 
 ---
 
 ## Privacy & Network Policy
 
-HYJI is local-first and makes **no automatic network requests** — the one launch-time update check is opt-in and off by default. In full:
+HYJI is local-first and makes **no automatic network requests** — the optional launch-time update check is off by default. There are exactly two online features, and both run only when you ask. In full:
 
-- **The only online feature is the metadata lookup** ("🌐 Fetch metadata"), and it runs only when you click it. It sends the paper's **DOI or arXiv ID — nothing else** — directly to `api.crossref.org` (Crossref, the non-profit DOI registry) or `export.arxiv.org` (arXiv, Cornell University) and reads back the public bibliographic record. These two domains are hard-coded as an allowlist in the Rust backend; the app cannot request any other host.
-- **Your PDFs, notes, highlights, and library never leave your computer.** There is no account, no telemetry, no proxy server — requests go straight from your machine to the non-profit source.
+- **Metadata lookup** ("🌐 Fetch metadata") runs only when you click it. It sends the paper's **DOI or arXiv ID — nothing else** — directly to `api.crossref.org` (Crossref, the non-profit DOI registry) or `export.arxiv.org` (arXiv, Cornell University) and reads back the public bibliographic record. These two domains are hard-coded as an allowlist in the Rust backend; the lookup cannot reach any other host.
+- **Your PDFs, notes, highlights, and library never leave your computer.** The citation preview is computed locally from the PDF itself. There is no account, no telemetry, no proxy server — requests go straight from your machine to the non-profit source.
 - **Before the first lookup**, a one-time dialog explains exactly what will be sent; Cancel sends nothing.
 - **Update check** (Help → Check for Updates…) sends **one request to `github.com`** — the release feed of this repository — and only when you click it. Nothing about you or your library is sent; the reply is the newest version number and its release notes. Installing from that dialog downloads the signed installer from the same GitHub Releases page and verifies its signature before running it.
 - **Automatic check at launch is opt-in and off by default** (Preferences → Network & privacy → "Check for updates automatically at launch"). When on, HYJI makes that same single request to `github.com` about 5 s after launch and stays silent unless a newer version exists.
@@ -126,6 +129,7 @@ In line with the privacy policy above, HYJI never checks for updates unless you 
 4. **Highlight** — Drag-select text in the PDF → the selection menu appears → pick a highlight / underline / strikeout color
 5. **Take notes** — In the same menu choose `Send to Differentiation` or `Send to Questions`; click 🔗 on any linked bullet to jump back to the source
 6. **Triage** — Set the level (★ / ★★ / ★★★) in the tracker's Metadata section; swipe a sidebar row right to flag it ⚑ Revisit, left to delete it
+7. **Follow citations** — Hover a citation like [47] to preview the referenced paper; click it to jump to the bibliography and *Back to reading* to return
 
 ### Level & Revisit at a glance
 
@@ -155,7 +159,8 @@ Color is only a secondary cue (gray → orange → red for the level, yellow for
 | State | Zustand |
 | Build | Vite |
 | Graph | D3.js (force layout) |
-| PDF export | pdf-lib |
+| PDF export / annotation import | pdf-lib |
+| Updates | tauri-plugin-updater (signed installers from GitHub Releases) |
 
 ---
 
@@ -199,6 +204,14 @@ The built installer will be at `src-tauri/target/release/bundle/msi/`.
 ### A document renders differently than in another viewer
 
 Preferences → **PDF render engine** → *pdf.js (classic)* switches back to the pre-3.0 renderer for comparison; the setting applies immediately to open tabs. Please open an issue with the PDF if PDFium gets something wrong.
+
+### No citation card appears when hovering a citation
+
+The preview needs the citation to be a real link inside the PDF. Most LaTeX (hyperref) papers have them; some publisher PDFs, scans and Word exports don't — there is nothing to preview in that case. Links that point back to page numbers ("cited on pages 2, 5") also show no card. Check View → Citation Preview on Hover: turning all four fields off disables the card.
+
+### Equations can't be selected or searched in some PDFs
+
+A few LaTeX workflows attach the equation's LaTeX source (`/ActualText`) to formulas. PDFium then reports that source instead of the visible symbols, so such formulas can't be selected or found by search under the default engine. Switch that document to Preferences → PDF render engine → *pdf.js (classic)*.
 
 ### Keyword graph shows word fragments (e.g. `corre`, `turefinetuning`)
 
