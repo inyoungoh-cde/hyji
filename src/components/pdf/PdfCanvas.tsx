@@ -14,6 +14,7 @@ import {
   pdfiumText,
   pdfiumLinks,
   pdfiumSearch,
+  pdfiumLinkEntry,
   type PdfiumDoc,
   type PdfiumTextPage,
   type PdfiumLink,
@@ -21,6 +22,8 @@ import {
 } from "../../lib/pdfium";
 import { useUiStore } from "../../stores/ui";
 import type { Annotation } from "../../types";
+import { parseCitation } from "../../lib/citeParse";
+import { CitePreview, type CitePreviewData } from "./CitePreview";
 
 export interface PdfRect {
   x: number;
@@ -487,6 +490,18 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
   const textCache = useRef<Map<number, Promise<PageText>>>(new Map());
   const textReady = useRef<Map<number, PageText>>(new Map());
   const linksCache = useRef<Map<number, Promise<PdfiumLink[]>>>(new Map());
+  // Citation hover card (3.4). Entries are resolved once per link and cached
+  // for the document; the card itself is React state rendered at the root.
+  const citeFields = useUiStore((s) => s.citeFields);
+  const citeFieldsRef = useRef(citeFields);
+  citeFieldsRef.current = citeFields;
+  const citeCache = useRef<Map<string, Promise<CitePreviewData | null>>>(new Map());
+  const citeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const citeToken = useRef(0);
+  const [citeCard, setCiteCard] = useState<{
+    data: CitePreviewData;
+    anchor: { left: number; top: number; right: number; bottom: number };
+  } | null>(null);
   const searchCache = useRef<Map<number, { query: string; matches: PdfiumSearchMatch[] }>>(new Map());
   const searchGen = useRef(0);
   // Props read from inside render callbacks go through refs: a changed
@@ -576,6 +591,8 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     textReady.current.clear();
     linksCache.current.clear();
     searchCache.current.clear();
+    citeCache.current.clear();
+    setCiteCard(null);
     setPages([]);
     setDoc(null);
     setPdfiumDoc(null);
@@ -700,12 +717,47 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
     setTimeout(() => flash.remove(), 3500);
   }, [scale]);
 
+  // Resolve what a page link points at: the label under the link on its own
+  // page (e.g. "47") helps the Rust side pick the right bibliography line.
+  const resolveCite = useCallback((l: PdfiumLink, pageNum: number, index: number): Promise<CitePreviewData | null> => {
+    const key = `${pageNum}:${index}`;
+    const hit = citeCache.current.get(key);
+    if (hit) return hit;
+    const doc = pdfiumDoc;
+    if (!doc || l.destPage == null || l.destY == null) return Promise.resolve(null);
+    const p = (async (): Promise<CitePreviewData | null> => {
+      let label = "";
+      try {
+        const pt = await getPageText(pageNum);
+        for (let i = 0; i < pt.tp.chars.length; i++) {
+          const c = pt.tp.chars[i];
+          if (!pt.visible[i]) continue;
+          const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+          if (cx >= l.x && cx <= l.x + l.w && cy >= l.y && cy <= l.y + l.h) label += c.c;
+        }
+      } catch { /* label is only a hint */ }
+      const entry = await pdfiumLinkEntry(doc.id, l.destPage!, l.destX, l.destY!, label.trim());
+      if (!entry || !entry.text.trim()) return null;
+      if (entry.kind === "reference") return { kind: "reference", parsed: parseCitation(entry.text), raw: entry.text };
+      return { kind: "other", raw: entry.text };
+    })();
+    p.catch(() => citeCache.current.delete(key));
+    citeCache.current.set(key, p);
+    return p;
+  }, [pdfiumDoc, getPageText]);
+
+  const hideCite = useCallback(() => {
+    citeToken.current++;
+    if (citeTimer.current) { clearTimeout(citeTimer.current); citeTimer.current = null; }
+    setCiteCard(null);
+  }, []);
+
   const buildLinkLayer = useCallback((links: PdfiumLink[], pageNum: number): HTMLDivElement => {
     const layer = document.createElement("div");
     layer.className = "annotationLayer";
     layer.dataset.page = String(pageNum);
-    for (const l of links) {
-      if (l.kind === "none") continue;
+    links.forEach((l, index) => {
+      if (l.kind === "none") return;
       const section = document.createElement("section");
       section.className = "linkAnnotation";
       section.style.cssText = `left:${l.x * scale}px;top:${l.y * scale}px;width:${l.w * scale}px;height:${l.h * scale}px;`;
@@ -717,8 +769,26 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       } else {
         a.href = `#page=${(l.destPage ?? 0) + 1}`;
       }
+      if (l.kind === "page") {
+        // Hover preview: wait a moment so sweeping the pointer across a line
+        // of citations does not flicker cards; drop stale resolutions.
+        a.addEventListener("mouseenter", () => {
+          const f = citeFieldsRef.current;
+          if (!f.authors && !f.title && !f.venue && !f.year) return;
+          const token = ++citeToken.current;
+          if (citeTimer.current) clearTimeout(citeTimer.current);
+          citeTimer.current = setTimeout(async () => {
+            const data = await resolveCite(l, pageNum, index);
+            if (token !== citeToken.current || !data || !a.isConnected) return;
+            const r = a.getBoundingClientRect();
+            setCiteCard({ data, anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
+          }, 280);
+        });
+        a.addEventListener("mouseleave", hideCite);
+      }
       a.addEventListener("click", (e) => {
         e.preventDefault();
+        hideCite();
         if (l.kind === "uri") {
           const uri = l.uri ?? "";
           // External links open in the system browser, never inside the WebView.
@@ -731,9 +801,9 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       });
       section.appendChild(a);
       layer.appendChild(section);
-    }
+    });
     return layer;
-  }, [scale, navigateInternal]);
+  }, [scale, navigateInternal, resolveCite, hideCite]);
 
   // ── In-document search (PDFium engine) ──
   // Matches come from pdfium_search per rendered page (cached per page +
@@ -1524,6 +1594,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
       ref={containerRef}
       className={`flex-1 overflow-y-auto bg-[#525659] hyji-pdf-scroll ${pdfDarkMode ? "hyji-pdf-dark" : ""}`}
       onScroll={(e) => {
+        if (citeCard) hideCite();
         if (loadedFileRef.current === filePath) {
           scrollMemory.set(filePath, e.currentTarget.scrollTop);
         }
@@ -1538,6 +1609,7 @@ export const PdfCanvas = forwardRef<PdfCanvasHandle, PdfCanvasProps>(function Pd
         }, 80);
       }}
     >
+        {citeCard && <CitePreview data={citeCard.data} fields={citeFields} anchor={citeCard.anchor} inverted={pdfDarkMode} />}
         <div className="flex flex-col items-center gap-3 py-4 hyji-pdf-pages">
           {pages.length === 0 && (
             <div className="flex items-center justify-center py-24">

@@ -7,6 +7,17 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [3.4] - 2026-09-29
+
+### Added
+
+- **Citation preview on hover.** Rest the pointer on an in-text citation link such as [47] and a small card shows what it refers to — `[47] Tang et al.` / **Contrastive boundary learning for point cloud segmentation** / `CVPR` 2022 — without leaving the page. Clicking still jumps to the bibliography with *Back to reading*, as before. Works for PDFs whose citations are real links (virtually all LaTeX/hyperref papers); PDFs without internal links show no card.
+  - **View → Citation Preview on Hover** chooses the fields: *Authors (First Author et al.)*, *Title*, *Venue (Abbreviated, e.g. ECCV)* and *Year* — all on by default, remembered across launches; turning all four off disables the card. Each field has its own look (label chip + authors, bold title, venue pill, muted year) so they stay distinguishable in any combination.
+  - Links to figures, tables, sections and footnotes show the target's caption or first line instead.
+  - In PDF dark mode the card switches to a light palette so it stays readable against the darkened page.
+  - **Accuracy, measured on 12 papers from a real library:** the right bibliography entry was found for every reference link that has one (all numbered styles, plus two-column author-year SIGGRAPH/ACM style and APA-style author-year, including entries that continue across a column or page break). Splitting entries into author / title / venue / year was checked by hand on a 343-entry gold set: author and year 100 %, title and venue ≥ 99 % (97.5 % on the held-out part), 94 % of venues recognised by name. When a split is uncertain, the card shows the entry text verbatim rather than a wrong field.
+- **Venue name list grew from 235 to 302 entries**, with aliases for common spellings (CVPR's 2025 name, "Adv. Neural Inform. Process. Syst.", T-PAMI, TOG and IJCV variants, arXiv/CoRR) — used by the preview and by exports' abbreviation styles.
+
 ## [3.3] - 2026-09-29
 
 3.3 is the first installer to carry the 3.2 changes below — the 3.2 release build failed in CI (the npm `@tauri-apps/api`, `plugin-updater` and `plugin-process` packages had drifted to newer minor versions than their Rust crates, which the Tauri CLI refuses to bundle). The JS packages are now pinned to the crates' versions.

@@ -111,6 +111,10 @@ export default function App() {
       // Tools → Auto Fit Width on Open. The native check item flips its own
       // mark on click; the store is the source of truth and re-syncs it.
       onMenuEvent("auto-fit", () => useUiStore.getState().toggleAutoFitOnOpen()),
+      onMenuEvent("cite-authors", () => useUiStore.getState().toggleCiteField("authors")),
+      onMenuEvent("cite-title", () => useUiStore.getState().toggleCiteField("title")),
+      onMenuEvent("cite-venue", () => useUiStore.getState().toggleCiteField("venue")),
+      onMenuEvent("cite-year", () => useUiStore.getState().toggleCiteField("year")),
     ];
     return () => unsubs.forEach((fn) => fn());
   }, [toggleSidebar, toggleTracker, setTextSize]);
@@ -119,8 +123,15 @@ export default function App() {
   // preference (the Rust side builds it checked; this corrects it at launch).
   const autoFitOnOpen = useUiStore((s) => s.autoFitOnOpen);
   useEffect(() => {
-    invoke("set_auto_fit_checked", { checked: autoFitOnOpen }).catch(() => undefined);
+    invoke("set_menu_checked", { id: "auto-fit", checked: autoFitOnOpen }).catch(() => undefined);
   }, [autoFitOnOpen]);
+  // Same for View → Citation Preview on Hover.
+  const citeFields = useUiStore((s) => s.citeFields);
+  useEffect(() => {
+    for (const [field, on] of Object.entries(citeFields)) {
+      invoke("set_menu_checked", { id: `cite-${field}`, checked: on }).catch(() => undefined);
+    }
+  }, [citeFields]);
 
   // Global keyboard shortcuts
   useEffect(() => {

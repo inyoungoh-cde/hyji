@@ -144,6 +144,8 @@ impl CachedPage {
 pub struct Doc {
     // Dropped before `doc`: PDFium pages must be closed before their document.
     pages: Mutex<Vec<Arc<CachedPage>>>,
+    /// Link-target layouts by page index (`page_layout`).
+    layouts: Mutex<HashMap<u32, Arc<PageLayout>>>,
     doc: PdfDocument<'static>,
     key: DocKey,
 }
@@ -159,7 +161,7 @@ impl Doc {
             }
             other => format!("{path}: {}", perr(other)),
         })?;
-        Ok(Doc { pages: Mutex::new(Vec::new()), doc, key })
+        Ok(Doc { pages: Mutex::new(Vec::new()), layouts: Mutex::new(HashMap::new()), doc, key })
     }
 
     pub fn document(&self) -> &PdfDocument<'static> {
@@ -890,6 +892,10 @@ pub struct Link {
     /// Destination's vertical position in DISPLAY points of the target page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dest_y: Option<f32>,
+    /// Destination's horizontal position in DISPLAY points, when the view
+    /// carries one (/XYZ left, /FitR left).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dest_x: Option<f32>,
 }
 
 /// Page-space (x?, y) of a destination when its view carries a vertical
@@ -921,20 +927,22 @@ fn target_frame(doc: &Doc, memo: &mut FrameMemo, index: u32) -> Option<PageFrame
     })
 }
 
+/// (page, display y, display x) of a destination.
 fn resolve_destination(
     doc: &Doc,
     memo: &mut FrameMemo,
     dest: &PdfDestination,
-) -> (Option<u32>, Option<f32>) {
-    let Ok(index) = dest.page_index() else { return (None, None) };
+) -> (Option<u32>, Option<f32>, Option<f32>) {
+    let Ok(index) = dest.page_index() else { return (None, None, None) };
     let index = index as u32;
+    // view_settings() reads x/y via FPDFDest_GetLocationInPage (hasX/hasY).
     let point = dest.view_settings().ok().and_then(|v| destination_point(&v));
-    let dest_y = point.and_then(|(x, y)| {
+    let display = point.and_then(|(x, y)| {
         let frame = target_frame(doc, memo, index)?;
-        let x = x.unwrap_or(frame.left);
-        Some(frame.to_display(x, y).1)
+        let (dx, dy) = frame.to_display(x.unwrap_or(frame.left), y);
+        Some((dy, x.map(|_| dx)))
     });
-    (Some(index), dest_y)
+    (Some(index), display.map(|d| d.0), display.and_then(|d| d.1))
 }
 
 /// Link annotations of the page (FPDFLink_Enumerate), boxes in display points.
@@ -956,6 +964,7 @@ pub fn page_links(doc: &Doc, index: u32) -> Result<Vec<Link>, String> {
             uri: None,
             dest_page: None,
             dest_y: None,
+            dest_x: None,
         };
         if let Some(action) = link.action() {
             if let Some(uri) = action.as_uri_action() {
@@ -965,28 +974,1131 @@ pub fn page_links(doc: &Doc, index: u32) -> Result<Vec<Link>, String> {
                 }
             } else if let Some(local) = action.as_local_destination_action() {
                 if let Ok(dest) = local.destination() {
-                    let (p, y) = resolve_destination(doc, &mut memo, &dest);
+                    let (p, y, x) = resolve_destination(doc, &mut memo, &dest);
                     if p.is_some() {
                         entry.kind = "page";
                         entry.dest_page = p;
                         entry.dest_y = y;
+                        entry.dest_x = x;
                     }
                 }
             }
         }
         if entry.kind == "none" {
             if let Some(dest) = link.destination() {
-                let (p, y) = resolve_destination(doc, &mut memo, &dest);
+                let (p, y, x) = resolve_destination(doc, &mut memo, &dest);
                 if p.is_some() {
                     entry.kind = "page";
                     entry.dest_page = p;
                     entry.dest_y = y;
+                    entry.dest_x = x;
                 }
             }
         }
         out.push(entry);
     }
     Ok(out)
+}
+
+// ── Link targets (citation hover cards) ──
+//
+// `link_entry` turns an internal link's destination into the text it points
+// at: the bibliography entry for an in-text citation, else the caption or
+// first line of a figure / table / section / footnote target. Works on
+// visual lines rebuilt from the TextPage and grouped into columns, so it does
+// not depend on the content-stream order PDFium reports.
+
+const ENTRY_MAX_CHARS: usize = 600;
+const OTHER_MAX_CHARS: usize = 200;
+/// Per-document memo of page layouts (lines + columns); small pure data.
+const LAYOUT_MEMO: usize = 64;
+/// How far back `under_references_heading` looks for the heading.
+const HEADING_LOOKBACK_PAGES: u32 = 10;
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkEntry {
+    pub text: String,
+    /// "reference" | "other"
+    pub kind: &'static str,
+    /// Union box of the entry's lines on the destination page (display pt).
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+/// One visual text line in display points.
+#[derive(Debug, Clone)]
+struct TLine {
+    top: f32,
+    bottom: f32,
+    left: f32,
+    right: f32,
+    font_size: f32,
+    text: String,
+}
+
+impl TLine {
+    fn height(&self) -> f32 {
+        self.bottom - self.top
+    }
+}
+
+fn median(mut v: Vec<f32>) -> Option<f32> {
+    v.retain(|x| x.is_finite());
+    if v.is_empty() {
+        return None;
+    }
+    v.sort_by(|a, b| a.total_cmp(b));
+    Some(v[v.len() / 2])
+}
+
+/// Hyphen-like chars that may end a line inside a word. PDFium reports a
+/// line-end hyphen it recognised as U+0002; U+00AD is a PDF soft hyphen.
+fn is_hyphen(c: char) -> bool {
+    matches!(c, '-' | '\u{AD}' | '\u{2}' | '\u{2010}')
+}
+
+struct LineAcc {
+    top: f32,
+    bottom: f32,
+    left: f32,
+    right: f32,
+    sizes: Vec<f32>,
+    text: String,
+}
+
+impl LineAcc {
+    fn finish(self, out: &mut Vec<TLine>) {
+        let text = self.text.trim().to_string();
+        if self.sizes.is_empty() || text.is_empty() {
+            return;
+        }
+        out.push(TLine {
+            top: self.top,
+            bottom: self.bottom,
+            left: self.left,
+            right: self.right,
+            font_size: median(self.sizes).unwrap_or(self.bottom - self.top),
+            text,
+        });
+    }
+}
+
+/// Visual lines of a page: PDFium line segments, invisible chars dropped
+/// (`w==h==0` = /ActualText replacement, centre outside the page = under the
+/// CropBox), non-upright text dropped, and segments split at gaps wider than
+/// two ems (a column gutter PDFium did not break at).
+fn page_lines(text: &TextPage, width: f32, height: f32) -> Vec<TLine> {
+    let mut out: Vec<TLine> = Vec::new();
+    let n = text.chars.len();
+    let mut start = 0usize;
+    let mut breaks = text.line_breaks.iter();
+    while start < n {
+        let end = breaks
+            .next()
+            .map(|&b| (b as usize + 1).clamp(start + 1, n))
+            .unwrap_or(n);
+        let mut cur: Option<LineAcc> = None;
+        for ch in &text.chars[start..end] {
+            let Some(c0) = ch.c.chars().next() else { continue };
+            if ch.c.chars().all(char::is_whitespace) {
+                if let Some(acc) = cur.as_mut() {
+                    if !acc.text.ends_with(' ') {
+                        acc.text.push(' ');
+                    }
+                }
+                continue;
+            }
+            if matches!(c0, '\u{AD}' | '\u{2}') {
+                // Soft hyphens may carry no box, and PDFium sometimes puts
+                // one after its own line break; keep it on the line it ends.
+                match cur.as_mut() {
+                    Some(acc) => acc.text.push(c0),
+                    None => {
+                        if let Some(last) = out.last_mut() {
+                            last.text.push(c0);
+                        }
+                    }
+                }
+                continue;
+            }
+            let (cx, cy) = (ch.x + ch.w / 2.0, ch.y + ch.h / 2.0);
+            let visible = (ch.w > 0.0 || ch.h > 0.0)
+                && ch.w.is_finite()
+                && ch.h.is_finite()
+                && (0.0..=width).contains(&cx)
+                && (0.0..=height).contains(&cy);
+            if !visible || ch.rot != 0 {
+                continue;
+            }
+            if let Some(acc) = &cur {
+                let em = ch.font_size.max(1.0);
+                let gap = ch.x - acc.right;
+                if gap > (2.0 * em).max(8.0) || ch.x + ch.w < acc.left - 2.0 * em {
+                    if let Some(done) = cur.take() {
+                        done.finish(&mut out);
+                    }
+                }
+            }
+            let acc = cur.get_or_insert_with(|| LineAcc {
+                top: f32::MAX,
+                bottom: f32::MIN,
+                left: f32::MAX,
+                right: f32::MIN,
+                sizes: Vec::new(),
+                text: String::new(),
+            });
+            acc.top = acc.top.min(ch.y);
+            acc.bottom = acc.bottom.max(ch.y + ch.h);
+            acc.left = acc.left.min(ch.x);
+            acc.right = acc.right.max(ch.x + ch.w);
+            acc.sizes.push(ch.font_size);
+            acc.text.push_str(&ch.c);
+        }
+        if let Some(acc) = cur {
+            acc.finish(&mut out);
+        }
+        start = end;
+    }
+    out
+}
+
+#[derive(Debug, Clone)]
+struct Column {
+    /// Robust extent (quartiles of the narrow lines' lefts / rights), so a stray
+    /// sub-figure label or a full-width caption does not widen the column.
+    x0: f32,
+    x1: f32,
+    /// Top to bottom; lines sharing a row are merged.
+    lines: Vec<TLine>,
+    /// Median baseline-to-baseline pitch.
+    pitch: f32,
+    font: f32,
+    /// `lines[body.0..body.1]` excludes running heads and page footers.
+    body: (usize, usize),
+}
+
+impl Column {
+    fn new(mut lines: Vec<TLine>, page_height: f32, narrow_max: f32) -> Column {
+        lines.sort_by(|a, b| a.top.total_cmp(&b.top).then(a.left.total_cmp(&b.left)));
+        let mut merged: Vec<TLine> = Vec::with_capacity(lines.len());
+        for ln in lines {
+            if let Some(last) = merged.last_mut() {
+                let overlap = last.bottom.min(ln.bottom) - last.top.max(ln.top);
+                if overlap >= 0.5 * last.height().min(ln.height()) {
+                    last.text = if ln.left >= last.left {
+                        format!("{} {}", last.text, ln.text)
+                    } else {
+                        format!("{} {}", ln.text, last.text)
+                    };
+                    last.top = last.top.min(ln.top);
+                    last.bottom = last.bottom.max(ln.bottom);
+                    last.left = last.left.min(ln.left);
+                    last.right = last.right.max(ln.right);
+                    continue;
+                }
+            }
+            merged.push(ln);
+        }
+        let lines = merged;
+        let font = median(lines.iter().map(|l| l.font_size).collect()).unwrap_or(10.0);
+        let pitch = median(
+            lines
+                .windows(2)
+                .map(|w| w[1].bottom - w[0].bottom)
+                .filter(|d| *d > 0.5 * font && *d < 3.0 * font)
+                .collect(),
+        )
+        .unwrap_or(1.2 * font);
+        let narrow: Vec<&TLine> = lines.iter().filter(|l| l.right - l.left <= narrow_max).collect();
+        let pool: Vec<&TLine> =
+            if narrow.len() >= 3 && narrow.len() * 2 >= lines.len() { narrow } else { lines.iter().collect() };
+        let mut lefts: Vec<f32> = pool.iter().map(|l| l.left).collect();
+        let mut rights: Vec<f32> = pool.iter().map(|l| l.right).collect();
+        lefts.sort_by(|a, b| a.total_cmp(b));
+        rights.sort_by(|a, b| a.total_cmp(b));
+        let x0 = lefts.get(lefts.len() / 4).copied().unwrap_or(0.0);
+        let x1 = rights.get(rights.len().saturating_sub(1 + rights.len() / 4)).copied().unwrap_or(x0);
+        let gap = |i: usize| lines[i + 1].bottom - lines[i].bottom;
+        let (mut s, mut e) = (0usize, lines.len());
+        while s + 1 < e && s < 3 && lines[s].bottom < 0.1 * page_height && gap(s) > 1.6 * pitch {
+            s += 1;
+        }
+        while e > s + 1
+            && lines.len() - e < 3
+            && lines[e - 1].top > 0.9 * page_height
+            && gap(e - 2) > 1.6 * pitch
+        {
+            e -= 1;
+        }
+        Column { x0, x1, lines, pitch, font, body: (s, e) }
+    }
+}
+
+/// Lines of one page grouped into columns, left to right.
+#[derive(Debug, Clone)]
+pub struct PageLayout {
+    cols: Vec<Column>,
+    /// Median font size over the page.
+    font: f32,
+    text_left: f32,
+    text_right: f32,
+}
+
+/// x positions of column gutters: runs ≥ 8 pt that (almost) no narrow line
+/// covers.
+/// Wide lines (> 60 % of the text width: titles, full-width captions,
+/// running heads) are ignored; a page that is mostly wide lines is single-
+/// column. A split leaving fewer than three narrow lines on a side is undone.
+fn column_cuts(lines: &[TLine], left: f32, right: f32) -> Vec<f32> {
+    let span = right - left;
+    if span < 50.0 || lines.len() < 6 {
+        return Vec::new();
+    }
+    let narrow: Vec<&TLine> = lines.iter().filter(|l| l.right - l.left <= 0.6 * span).collect();
+    if narrow.len() * 2 < lines.len() {
+        return Vec::new();
+    }
+    let nb = span.ceil() as usize + 1;
+    let mut bins = vec![0u32; nb];
+    for l in &narrow {
+        let a = (l.left - left).floor().max(0.0) as usize;
+        let b = ((l.right - left).ceil().max(0.0) as usize).min(nb);
+        for bin in bins.iter_mut().take(b).skip(a) {
+            *bin += 1;
+        }
+    }
+    let (Some(first), Some(last)) =
+        (bins.iter().position(|&c| c > 0), bins.iter().rposition(|&c| c > 0))
+    else {
+        return Vec::new();
+    };
+    // A few stray items may cross a gutter (sub-figure labels, a centred
+    // page number): up to 5 % of the narrow lines are tolerated.
+    let stray = (narrow.len() / 20) as u32;
+    let mut cuts = Vec::new();
+    let mut run: Option<usize> = None;
+    for (x, &count) in bins.iter().enumerate().take(last + 1).skip(first) {
+        if count <= stray {
+            run.get_or_insert(x);
+        } else if let Some(s) = run.take() {
+            if x - s >= 8 {
+                cuts.push(left + (s + x) as f32 / 2.0);
+            }
+        }
+    }
+    while !cuts.is_empty() {
+        let mut counts = vec![0usize; cuts.len() + 1];
+        for l in &narrow {
+            let c = (l.left + l.right) / 2.0;
+            counts[cuts.iter().filter(|&&k| c >= k).count()] += 1;
+        }
+        match counts.iter().position(|&n| n < 3) {
+            Some(i) => {
+                let k = i.saturating_sub(1).min(cuts.len() - 1);
+                cuts.remove(k);
+            }
+            None => break,
+        }
+    }
+    cuts
+}
+
+impl PageLayout {
+    fn build(text: &TextPage, width: f32, height: f32) -> PageLayout {
+        let lines = page_lines(text, width, height);
+        let font = median(lines.iter().map(|l| l.font_size).collect()).unwrap_or(10.0);
+        let text_left = lines.iter().map(|l| l.left).fold(f32::MAX, f32::min);
+        let text_right = lines.iter().map(|l| l.right).fold(f32::MIN, f32::max);
+        let (text_left, text_right) =
+            if text_left < text_right { (text_left, text_right) } else { (0.0, width) };
+        let cuts = column_cuts(&lines, text_left, text_right);
+        let span = text_right - text_left;
+        let mut groups: Vec<Vec<TLine>> = vec![Vec::new(); cuts.len() + 1];
+        for ln in lines {
+            let x = if ln.right - ln.left <= 0.6 * span { (ln.left + ln.right) / 2.0 } else { ln.left };
+            groups[cuts.iter().filter(|&&c| x >= c).count()].push(ln);
+        }
+        let cols = groups
+            .into_iter()
+            .filter(|g| !g.is_empty())
+            .map(|g| Column::new(g, height, 0.6 * span))
+            .collect();
+        PageLayout { cols, font, text_left, text_right }
+    }
+
+    /// Column a destination x points into; None when x lies outside the
+    /// text area (a meaningless x such as 0). Bibliography dests usually sit
+    /// at or up to ~25 pt LEFT of their column (the list's hanging margin),
+    /// which can be inside the previous column's right edge: x well inside a
+    /// column picks it, else a column starting 0–40 pt right of x, else the
+    /// nearest one.
+    fn column_at(&self, x: f32) -> Option<usize> {
+        if self.cols.is_empty() || x < self.text_left - 40.0 || x > self.text_right + 20.0 {
+            return None;
+        }
+        if let Some(i) = self.cols.iter().position(|c| x >= c.x0 - 6.0 && x <= c.x1 - 20.0) {
+            return Some(i);
+        }
+        if let Some(i) = (0..self.cols.len())
+            .filter(|&i| self.cols[i].x0 >= x - 6.0 && self.cols[i].x0 <= x + 40.0)
+            .min_by(|&a, &b| self.cols[a].x0.total_cmp(&self.cols[b].x0))
+        {
+            return Some(i);
+        }
+        let dist = |c: &Column| if x < c.x0 { c.x0 - x } else if x > c.x1 { x - c.x1 } else { 0.0 };
+        (0..self.cols.len()).min_by(|&a, &b| dist(&self.cols[a]).total_cmp(&dist(&self.cols[b])))
+    }
+
+    /// Every line in reading order (columns left to right, top to bottom).
+    fn reading_order(&self) -> impl Iterator<Item = (usize, usize, &TLine)> {
+        self.cols
+            .iter()
+            .enumerate()
+            .flat_map(|(ci, c)| c.lines.iter().enumerate().map(move |(li, l)| (ci, li, l)))
+    }
+}
+
+// Entry-start markers.
+
+/// Inner text of a leading "[...]" label.
+fn bracket_label(text: &str) -> Option<&str> {
+    let rest = text.trim_start().strip_prefix('[')?;
+    let inner = rest[..rest.find(']')?].trim();
+    (!inner.is_empty() && inner.chars().count() <= 24 && !inner.contains('[')).then_some(inner)
+}
+
+/// Leading "12." / "12. " list number (≤ 3 digits).
+fn dotted_number(text: &str) -> Option<&str> {
+    let t = text.trim_start();
+    let n = t.bytes().take_while(u8::is_ascii_digit).count();
+    if n == 0 || n > 3 {
+        return None;
+    }
+    let mut rest = t[n..].strip_prefix('.')?.chars();
+    match rest.next() {
+        None => Some(&t[..n]),
+        Some(c) if c.is_whitespace() || c.is_uppercase() => Some(&t[..n]),
+        _ => None,
+    }
+}
+
+fn starts_with_number(text: &str, n: &str) -> bool {
+    bracket_label(text) == Some(n) || (n.len() <= 3 && dotted_number(text) == Some(n))
+}
+
+/// First digit run of a link label ("[47]" → "47", "Fig. 3" → "3").
+/// A dotted section number ("4.1") is not a list number: None.
+fn label_number(label: &str) -> Option<&str> {
+    let s = label.find(|c: char| c.is_ascii_digit())?;
+    let n = label[s..].bytes().take_while(u8::is_ascii_digit).count();
+    let rest = label[s + n..].as_bytes();
+    let section = rest.first() == Some(&b'.') && rest.get(1).is_some_and(u8::is_ascii_digit);
+    (n <= 6 && !section).then(|| &label[s..s + n])
+}
+
+fn is_references_heading(text: &str) -> bool {
+    let t = text.trim();
+    // Drop a leading section number ("7", "7.", "VII.").
+    let t = match t.split_once(char::is_whitespace) {
+        Some((head, rest)) => {
+            let h = head.trim_end_matches('.');
+            if !h.is_empty() && h.chars().all(|c| c.is_ascii_digit() || "IVXLC".contains(c)) {
+                rest
+            } else {
+                t
+            }
+        }
+        None => t,
+    };
+    let squashed: String = t.chars().filter(|c| !c.is_whitespace()).collect();
+    let squashed = squashed.trim_end_matches([':', '.']).to_lowercase();
+    matches!(
+        squashed.as_str(),
+        "references"
+            | "reference"
+            | "bibliography"
+            | "referencesandnotes"
+            | "literaturecited"
+            | "workscited"
+            | "citedreferences"
+            | "literature"
+    )
+}
+
+/// A major heading that ends a bibliography (Appendix, Supplementary, "A
+/// Proofs" in a heading-sized font).
+fn is_section_break(ln: &TLine, page_font: f32) -> bool {
+    let t = ln.text.trim();
+    if t.chars().count() > 90 {
+        return false;
+    }
+    let lower = t.to_lowercase();
+    let lower = lower.trim_start_matches(|c: char| !c.is_alphabetic());
+    if lower.starts_with("appendix") || lower.starts_with("supplementary") || lower.starts_with("supplemental") {
+        return true;
+    }
+    ln.font_size >= 1.15 * page_font && !is_references_heading(t) && {
+        let mut words = t.split_whitespace();
+        let first = words.next().unwrap_or("");
+        let numbered = first.trim_end_matches('.').split('.').all(|p| {
+            !p.is_empty()
+                && (p.chars().all(|c| c.is_ascii_digit())
+                    || (p.len() == 1 && p.chars().all(|c| c.is_ascii_uppercase())))
+        });
+        numbered && words.next().is_some_and(|w| w.chars().next().is_some_and(char::is_uppercase))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Marker {
+    /// "[12]" (numeric) or "[Kaz06]" labels.
+    Bracket { numeric: bool },
+    /// "12. Author" lists.
+    Dotted,
+    /// No label: entry starts come from indentation / spacing.
+    Plain,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Indent {
+    /// Left edge of an entry's first line.
+    start: f32,
+    /// Left edge of its continuation lines.
+    cont: f32,
+}
+
+impl Indent {
+    fn hanging(&self) -> bool {
+        self.start < self.cont
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EntryCtx {
+    marker: Marker,
+    indent: Option<Indent>,
+    /// Left edge shared by the column's continuation lines. A non-start line
+    /// elsewhere (figure labels, a caption, a centred page number) is not
+    /// part of any entry.
+    cont: Option<f32>,
+}
+
+impl EntryCtx {
+    fn learn(col: &Column, around: usize, marker: Marker, hanging: Option<bool>) -> EntryCtx {
+        let indent = if marker == Marker::Plain { learn_indent(col, around, hanging) } else { None };
+        let mut ctx = EntryCtx { marker, indent, cont: indent.map(|i| i.cont) };
+        if ctx.cont.is_none() && (marker != Marker::Plain || indent.is_some()) {
+            let mut lefts: Vec<f32> = window(col, around)
+                .into_iter()
+                .filter(|&i| {
+                    let prev = i.checked_sub(1).map(|p| &col.lines[p]);
+                    !is_entry_start(&col.lines[i], prev, col, &ctx)
+                })
+                .map(|i| col.lines[i].left)
+                .collect();
+            lefts.sort_by(|a, b| a.total_cmp(b));
+            let mut best: Option<(usize, f32)> = None;
+            let mut i = 0;
+            while i < lefts.len() {
+                let j = lefts[i..].iter().take_while(|&&x| x - lefts[i] <= 1.2).count();
+                if j >= 3 && best.is_none_or(|b| j > b.0) {
+                    best = Some((j, lefts[i..i + j].iter().sum::<f32>() / j as f32));
+                }
+                i += j;
+            }
+            ctx.cont = best.map(|b| b.1);
+        }
+        ctx
+    }
+
+    fn off_grid(&self, ln: &TLine) -> bool {
+        self.cont.is_some_and(|c| (ln.left - c).abs() > 2.5)
+    }
+}
+
+/// Learns the two left edges of a hanging-indent (or first-line-indent)
+/// list from the lines around `around`: the two most common lefts (±1.2 pt),
+/// 2.5–40 pt apart, covering ≥ 70 % of the window. Which one starts an
+/// entry: the one whose preceding line is more often short (an entry's last
+/// line ends early; a justified continuation's predecessor is full width);
+/// `hanging` overrides that when already known from another column.
+/// Body-line indices around `around` (15 above, 30 below) set in the same
+/// font size (±4 %): a bibliography's geometry, not the body text above it.
+fn window(col: &Column, around: usize) -> Vec<usize> {
+    let (bs, be) = col.body;
+    let lo = around.saturating_sub(15).max(bs);
+    let hi = (around + 30).min(be);
+    let fs = col.lines.get(around).map(|l| l.font_size).unwrap_or(col.font);
+    let tol = (0.04 * fs).max(0.3);
+    (lo..hi).filter(|&i| (col.lines[i].font_size - fs).abs() <= tol).collect()
+}
+
+fn learn_indent(col: &Column, around: usize, hanging: Option<bool>) -> Option<Indent> {
+    let idx = window(col, around);
+    if idx.len() < 4 {
+        return None;
+    }
+    let win: Vec<&TLine> = idx.iter().map(|&i| &col.lines[i]).collect();
+    let mut lefts: Vec<f32> = win.iter().map(|l| l.left).collect();
+    lefts.sort_by(|a, b| a.total_cmp(b));
+    // (sum, count, last)
+    let mut clusters: Vec<(f32, usize, f32)> = Vec::new();
+    for x in lefts {
+        match clusters.last_mut() {
+            Some(c) if x - c.2 <= 1.2 => {
+                c.0 += x;
+                c.1 += 1;
+                c.2 = x;
+            }
+            _ => clusters.push((x, 1, x)),
+        }
+    }
+    clusters.sort_by(|a, b| b.1.cmp(&a.1));
+    if clusters.len() < 2
+        || clusters[1].1 < 2
+        || (clusters[0].1 + clusters[1].1) * 10 < win.len() * 7
+    {
+        return None;
+    }
+    let m0 = clusters[0].0 / clusters[0].1 as f32;
+    let m1 = clusters[1].0 / clusters[1].1 as f32;
+    let (a, b) = (m0.min(m1), m0.max(m1));
+    if !(2.5..=40.0).contains(&(b - a)) {
+        return None;
+    }
+    let hanging = hanging.unwrap_or_else(|| {
+        let right = win.iter().map(|l| l.right).fold(f32::MIN, f32::max);
+        let short_frac = |x: f32| {
+            let (mut n, mut short) = (0usize, 0usize);
+            for &i in idx.iter().filter(|&&i| i > 0) {
+                if (col.lines[i].left - x).abs() <= 1.2 {
+                    n += 1;
+                    if col.lines[i - 1].right < right - 6.0 {
+                        short += 1;
+                    }
+                }
+            }
+            if n == 0 { 0.0 } else { short as f32 / n as f32 }
+        };
+        short_frac(b) <= short_frac(a) + 0.25
+    });
+    Some(if hanging { Indent { start: a, cont: b } } else { Indent { start: b, cont: a } })
+}
+
+fn is_heading(ln: &TLine, col: &Column) -> bool {
+    is_references_heading(&ln.text)
+        || (ln.font_size >= 1.15 * col.font && ln.text.chars().count() < 80)
+}
+
+fn is_entry_start(ln: &TLine, prev: Option<&TLine>, col: &Column, ctx: &EntryCtx) -> bool {
+    match ctx.marker {
+        Marker::Bracket { numeric } => bracket_label(&ln.text).is_some_and(|inner| {
+            if numeric {
+                inner.chars().all(|c| c.is_ascii_digit())
+            } else {
+                !inner.contains(char::is_whitespace)
+                    && inner.chars().count() <= 12
+                    && !inner.eq_ignore_ascii_case("online")
+            }
+        }),
+        Marker::Dotted => dotted_number(&ln.text).is_some(),
+        Marker::Plain => match ctx.indent {
+            Some(ind) => (ln.left - ind.start).abs() <= 1.5 && (ln.left - ind.cont).abs() > 1.5,
+            None => prev.is_some_and(|p| {
+                // No structure to learn from: extra leading, or the previous
+                // line ends a sentence well short of the column edge.
+                let pitch = ln.bottom - p.bottom;
+                pitch > col.pitch + (0.15 * col.pitch).max(1.5)
+                    || (p.text.trim_end().ends_with('.') && p.right < col.x1 - 0.08 * (col.x1 - col.x0))
+            }),
+        },
+    }
+}
+
+/// Joins lines: a line ending in a hyphen before a lowercase word is
+/// dehyphenated ("segmen-" + "tation"); before anything else the hyphen is
+/// kept without a space ("Boundary-" + "Aware"). En-dash ends join tight.
+fn join_lines<'a>(lines: impl IntoIterator<Item = &'a str>) -> String {
+    let mut out = String::new();
+    for t in lines {
+        let t = t.trim();
+        if t.is_empty() {
+            continue;
+        }
+        match out.chars().last() {
+            None => {}
+            Some(c) if is_hyphen(c) => {
+                out.pop();
+                if !t.chars().next().is_some_and(char::is_lowercase) {
+                    out.push('-');
+                }
+            }
+            Some('\u{2013}') => {}
+            Some(_) => out.push(' '),
+        }
+        out.push_str(t);
+    }
+    out.replace('\u{AD}', "").replace('\u{2}', "-")
+}
+
+fn cap_text(mut s: String, max: usize) -> String {
+    if let Some((i, _)) = s.char_indices().nth(max) {
+        s.truncate(i);
+        s = s.trim_end().to_string();
+        s.push('\u{2026}');
+    }
+    s
+}
+
+fn union_box<'a>(lines: impl IntoIterator<Item = &'a TLine>) -> Option<Region> {
+    let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    for l in lines {
+        x0 = x0.min(l.left);
+        y0 = y0.min(l.top);
+        x1 = x1.max(l.right);
+        y1 = y1.max(l.bottom);
+    }
+    (x1 >= x0).then(|| Region { x: x0, y: y0, w: x1 - x0, h: y1 - y0 })
+}
+
+/// Line the destination points at: with a number label, a line starting
+/// "[N]" / "N." near `dest_y` (dests usually sit a little above the line);
+/// else the nearest line in the destination's column, preferring lines that
+/// start an entry (so a raised dest never picks the previous entry's tail).
+fn find_anchor(
+    lay: &PageLayout,
+    dest_x: Option<f32>,
+    dest_y: f32,
+    num: Option<&str>,
+) -> Option<(usize, usize)> {
+    let hint = dest_x.and_then(|x| lay.column_at(x));
+    if let Some(n) = num {
+        let mut best: Option<(f32, usize, usize)> = None;
+        for (ci, li, ln) in lay.reading_order() {
+            let d = ln.top - dest_y;
+            if !starts_with_number(&ln.text, n) || !(-20.0..=40.0).contains(&d) {
+                continue;
+            }
+            let score = d.abs() + if hint.is_some_and(|h| h != ci) { 25.0 } else { 0.0 };
+            if best.is_none_or(|b| score < b.0) {
+                best = Some((score, ci, li));
+            }
+        }
+        if let Some((_, ci, li)) = best {
+            return Some((ci, li));
+        }
+    }
+    let cols: Vec<usize> = match hint {
+        Some(h) => vec![h],
+        None => (0..lay.cols.len()).collect(),
+    };
+    // (score, ci, li) of the best line overall and of the best entry start.
+    let mut any: Option<(f32, usize, usize)> = None;
+    let mut start: Option<(f32, usize, usize)> = None;
+    for &ci in &cols {
+        let col = &lay.cols[ci];
+        let (bs, be) = col.body;
+        let near = (bs..be)
+            .min_by(|&a, &b| {
+                (col.lines[a].top - dest_y).abs().total_cmp(&(col.lines[b].top - dest_y).abs())
+            })
+            .unwrap_or(bs);
+        let bracketed = (bs..be).filter(|&i| bracket_label(&col.lines[i].text).is_some()).count();
+        let marker = if bracketed * 3 >= (be - bs).max(1) {
+            Marker::Bracket { numeric: false }
+        } else {
+            Marker::Plain
+        };
+        let ctx = EntryCtx { marker, indent: learn_indent(col, near, None), cont: None };
+        let structured = ctx.marker != Marker::Plain || ctx.indent.is_some();
+        for li in bs..be {
+            let ln = &col.lines[li];
+            let delta = ln.top - dest_y;
+            let contains = ln.top <= dest_y && dest_y <= ln.bottom;
+            if !((-12.0..=16.0).contains(&delta) || contains) {
+                continue;
+            }
+            let score = if delta >= 0.0 { delta } else { -delta * 1.3 };
+            if any.is_none_or(|b| score < b.0) {
+                any = Some((score, ci, li));
+            }
+            let prev = li.checked_sub(1).map(|p| &col.lines[p]);
+            let starts = is_heading(ln, col) || (structured && is_entry_start(ln, prev, col, &ctx));
+            if starts && start.is_none_or(|b| score < b.0) {
+                start = Some((score, ci, li));
+            }
+        }
+    }
+    match (start, any) {
+        (Some(s), Some(a)) if s.0 <= a.0 + 10.0 => return Some((s.1, s.2)),
+        (_, Some(a)) => return Some((a.1, a.2)),
+        _ => {}
+    }
+    // Nothing near: first line below the destination.
+    cols.iter()
+        .filter_map(|&ci| {
+            let col = &lay.cols[ci];
+            (col.body.0..col.body.1)
+                .find(|&li| col.lines[li].top >= dest_y && col.lines[li].top <= dest_y + 60.0)
+                .map(|li| (col.lines[li].top - dest_y, ci, li))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, ci, li)| (ci, li))
+}
+
+type LayoutFn<'a> = dyn FnMut(u32) -> Option<Arc<PageLayout>> + 'a;
+
+/// Whether the anchor sits under a References/Bibliography heading: scans
+/// backwards in reading order (this page, then up to 10 earlier pages); a
+/// section break (Appendix, …) met first means no.
+fn under_references_heading(get: &mut LayoutFn, page: u32, ci: usize, li: usize) -> bool {
+    for p in (page.saturating_sub(HEADING_LOOKBACK_PAGES)..=page).rev() {
+        let Some(lay) = get(p) else { continue };
+        let lines: Vec<&TLine> = lay
+            .reading_order()
+            .take_while(|&(c, l, _)| p != page || (c, l) < (ci, li))
+            .map(|(_, _, l)| l)
+            .collect();
+        for ln in lines.iter().rev() {
+            if is_references_heading(&ln.text) {
+                return true;
+            }
+            if is_section_break(ln, lay.font) {
+                return false;
+            }
+        }
+    }
+    false
+}
+
+/// Leading "Figure 3" / "Fig. 3" / "Table 3" / "Algorithm 3" number, and
+/// whether ':' / '.' / '|' follows it (a caption, not running text).
+fn caption_number(text: &str) -> Option<(&str, bool)> {
+    let t = text.trim_start();
+    let lower = t.to_ascii_lowercase();
+    let prefix = ["figure", "fig.", "fig", "table", "tab.", "algorithm", "alg."]
+        .iter()
+        .find(|p| lower.starts_with(*p))?;
+    let rest = t.get(prefix.len()..)?.trim_start();
+    let rest = rest.strip_prefix('S').unwrap_or(rest);
+    let n = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if n == 0 {
+        return None;
+    }
+    let after = rest[n..].chars().next();
+    if after.is_some_and(|c| c.is_alphanumeric()) {
+        return None;
+    }
+    Some((&rest[..n], after.is_some_and(|c| matches!(c, ':' | '.' | '|'))))
+}
+
+/// End (byte index, exclusive) of the first sentence at or after `from`.
+fn sentence_end(text: &str, from: usize) -> Option<usize> {
+    let bytes = text.as_bytes();
+    for (i, c) in text.char_indices() {
+        if i < from || c != '.' {
+            continue;
+        }
+        if bytes.get(i + 1).is_some_and(|b| !b.is_ascii_whitespace()) {
+            continue;
+        }
+        let word = text[..i].rsplit(char::is_whitespace).next().unwrap_or("").to_lowercase();
+        if word.chars().count() <= 1
+            || ["al", "e.g", "i.e", "vs", "fig", "eq", "etc", "cf", "sec", "resp"].contains(&word.as_str())
+        {
+            continue;
+        }
+        return Some(i + 1);
+    }
+    None
+}
+
+/// "Figure N" caption for a figure/table target: a strong caption (number
+/// followed by ':' '.' '|') anywhere on the page, nearest at or below the
+/// destination (hypcap dests sit at the float's top, the caption can be a
+/// page below); a weak one only within 30 pt above … 450 pt below and when
+/// the label itself names a figure/table. Returns the caption's first
+/// sentence and the lines it uses.
+fn caption_entry(lay: &PageLayout, n: &str, label: &str, dest_y: f32) -> Option<(String, Vec<TLine>)> {
+    let figure_label = {
+        let l = label.to_lowercase();
+        l.contains("fig") || l.contains("tab") || l.contains("alg")
+    };
+    let (_, c, l) = lay
+        .reading_order()
+        .filter_map(|(c, l, ln)| {
+            let (cn, strong) = caption_number(&ln.text)?;
+            let d = ln.top - dest_y;
+            if cn != n || !(strong || (figure_label && (-30.0..=450.0).contains(&d))) {
+                return None;
+            }
+            // Below (or just above) the dest first, then by distance.
+            let rank = if d >= -30.0 { d.abs() } else { 10_000.0 - d };
+            Some((rank, c, l))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))?;
+    let col = &lay.cols[c];
+    let mut used: Vec<TLine> = vec![col.lines[l].clone()];
+    for i in (l + 1)..col.body.1.min(l + 8) {
+        let (p, ln) = (&col.lines[i - 1], &col.lines[i]);
+        if ln.bottom - p.bottom > 1.6 * col.pitch || is_heading(ln, col) || caption_number(&ln.text).is_some() {
+            break;
+        }
+        used.push(ln.clone());
+    }
+    let joined = join_lines(used.iter().map(|l| l.text.as_str()));
+    let skip = joined.find(n).map(|i| (i + n.len() + 1).min(joined.len())).unwrap_or(0);
+    let text = match sentence_end(&joined, skip) {
+        Some(end) => joined[..end].to_string(),
+        None => joined,
+    };
+    // Box only the lines the sentence uses.
+    let mut acc = 0usize;
+    let keep = used
+        .iter()
+        .take_while(|l| {
+            let fits = acc < text.len();
+            acc += l.text.len() + 1;
+            fits
+        })
+        .count()
+        .max(1);
+    used.truncate(keep);
+    Some((cap_text(text, OTHER_MAX_CHARS), used))
+}
+
+/// Equation target: the line ending in "(N)" just below the destination.
+fn equation_line(lay: &PageLayout, n: &str, dest_y: f32) -> Option<TLine> {
+    let tag = format!("({n})");
+    lay.reading_order()
+        .filter(|(_, _, ln)| {
+            let d = ln.top - dest_y;
+            (-20.0..=80.0).contains(&d) && ln.text.split_whitespace().collect::<String>().ends_with(&tag)
+        })
+        .min_by(|a, b| (a.2.top - dest_y).abs().total_cmp(&(b.2.top - dest_y).abs()))
+        .map(|(_, _, ln)| ln.clone())
+}
+
+/// Figure/table/equation/section/footnote targets: a caption's first
+/// sentence, an equation line, else the anchor line.
+fn other_entry(
+    lay: &PageLayout,
+    anchor: Option<&TLine>,
+    num: Option<&str>,
+    label: &str,
+    dest_y: f32,
+) -> Option<(String, Vec<TLine>)> {
+    let anchor_numbered = anchor.is_some_and(|a| {
+        num.is_some_and(|n| a.text.trim_start().starts_with(n)) || is_references_heading(&a.text)
+    });
+    if let Some(n) = num.filter(|_| !anchor_numbered) {
+        if let Some(hit) = caption_entry(lay, n, label, dest_y) {
+            return Some(hit);
+        }
+        if let Some(eq) = equation_line(lay, n, dest_y) {
+            return Some((cap_text(eq.text.clone(), OTHER_MAX_CHARS), vec![eq]));
+        }
+    }
+    let a = anchor?;
+    Some((cap_text(a.text.clone(), OTHER_MAX_CHARS), vec![a.clone()]))
+}
+
+/// Core of `link_entry` over a page-layout accessor (tests feed synthetic
+/// layouts).
+fn entry_from_layouts(
+    get: &mut LayoutFn,
+    page_count: u32,
+    dest_page: u32,
+    dest_x: Option<f32>,
+    dest_y: f32,
+    label: &str,
+) -> Option<LinkEntry> {
+    let lay = get(dest_page)?;
+    let num = label_number(label);
+    let other = |anchor: Option<&TLine>| {
+        let (text, used) = other_entry(&lay, anchor, num, label, dest_y)?;
+        let b = union_box(&used)?;
+        Some(LinkEntry { text, kind: "other", x: b.x, y: b.y, w: b.w, h: b.h })
+    };
+    let Some((ci, li)) = find_anchor(&lay, dest_x, dest_y, num) else {
+        // Nothing near the dest (a figure image at a hypcap anchor).
+        return other(None);
+    };
+    let col = &lay.cols[ci];
+    let anchor = &col.lines[li];
+
+    let marker = match (bracket_label(&anchor.text), dotted_number(&anchor.text)) {
+        (Some(inner), _) => Marker::Bracket { numeric: inner.chars().all(|c| c.is_ascii_digit()) },
+        (None, Some(d)) if num == Some(d) => Marker::Dotted,
+        _ => Marker::Plain,
+    };
+    // A heading itself (a link to "References" or "Appendix A") is a
+    // section target, not an entry under it.
+    let is_reference = marker == Marker::Bracket { numeric: true }
+        || (!is_heading(anchor, col)
+            && !is_section_break(anchor, lay.font)
+            && under_references_heading(get, dest_page, ci, li));
+
+    if !is_reference {
+        return other(Some(anchor));
+    }
+
+    let mut ctx = EntryCtx::learn(col, li, marker, None);
+    let mut parts: Vec<(u32, TLine)> = vec![(dest_page, anchor.clone())];
+    let mut chars = anchor.text.chars().count();
+
+    // Walk down the anchor's column; an entry cut off by the column bottom
+    // continues at the top of the next column / the next page's first column.
+    let mut page = dest_page;
+    let mut cur = Arc::clone(&lay);
+    let (mut c, mut from, mut continuing) = (ci, li + 1, false);
+    for _ in 0..3 {
+        let column = &cur.cols[c];
+        let mut prev: Option<&TLine> = if continuing { None } else { Some(&column.lines[li]) };
+        let mut ended = false;
+        let mut skipped = 0;
+        for ln in column.lines.iter().take(column.body.1).skip(from) {
+            if let Some(p) = prev {
+                if ln.bottom - p.bottom > 1.6 * column.pitch {
+                    ended = true;
+                    break;
+                }
+            }
+            if is_heading(ln, column) || is_entry_start(ln, prev, column, &ctx) {
+                ended = true;
+                break;
+            }
+            if ctx.off_grid(ln) {
+                // Material above the flow at the top of the next column
+                // (a figure's labels / caption) is skipped; anywhere else an
+                // off-grid line ends the entry.
+                if prev.is_none() && skipped < 12 {
+                    skipped += 1;
+                    continue;
+                }
+                ended = true;
+                break;
+            }
+            parts.push((page, ln.clone()));
+            chars += ln.text.chars().count() + 1;
+            if chars >= ENTRY_MAX_CHARS {
+                ended = true;
+                break;
+            }
+            prev = Some(ln);
+        }
+        if ended {
+            break;
+        }
+        let src_indent = ctx.indent;
+        let src_cont = ctx.cont;
+        let src_x0 = column.x0;
+        if c + 1 < cur.cols.len() {
+            c += 1;
+        } else if page + 1 < page_count {
+            let Some(next) = get(page + 1) else { break };
+            if next.cols.is_empty() {
+                break;
+            }
+            page += 1;
+            cur = next;
+            c = 0;
+        } else {
+            break;
+        }
+        let next_col = &cur.cols[c];
+        from = next_col.body.0;
+        continuing = true;
+        let hanging = src_indent.map(|i| i.hanging());
+        ctx = EntryCtx::learn(next_col, from, ctx.marker, hanging);
+        let shift = next_col.x0 - src_x0;
+        if ctx.marker == Marker::Plain && ctx.indent.is_none() {
+            ctx.indent = src_indent.map(|i| Indent { start: i.start + shift, cont: i.cont + shift });
+        }
+        if ctx.cont.is_none() {
+            ctx.cont = ctx.indent.map(|i| i.cont).or(src_cont.map(|c| c + shift));
+        }
+    }
+
+    let text = cap_text(join_lines(parts.iter().map(|(_, l)| l.text.as_str())), ENTRY_MAX_CHARS);
+    let b = union_box(parts.iter().filter(|(p, _)| *p == dest_page).map(|(_, l)| l))?;
+    Some(LinkEntry { text, kind: "reference", x: b.x, y: b.y, w: b.w, h: b.h })
+}
+
+fn page_layout(doc: &Doc, index: u32) -> Result<Arc<PageLayout>, String> {
+    if let Some(hit) = doc.layouts.lock().unwrap_or_else(|p| p.into_inner()).get(&index) {
+        return Ok(Arc::clone(hit));
+    }
+    // Reuse a cached page's text; otherwise load the page outside the page
+    // cache (like link targets) so the viewer's pages are not evicted.
+    let cached = doc
+        .pages
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .iter()
+        .find(|p| p.index == index)
+        .cloned();
+    let layout = match cached {
+        Some(p) => {
+            let (w, h) = PageFrame::from_page(p.page()).display_size();
+            PageLayout::build(p.text()?, w, h)
+        }
+        None => {
+            let page = load_page(doc, index)?;
+            let (w, h) = PageFrame::from_page(&page).display_size();
+            PageLayout::build(&extract_text(&page)?, w, h)
+        }
+    };
+    let layout = Arc::new(layout);
+    let mut memo = doc.layouts.lock().unwrap_or_else(|p| p.into_inner());
+    if memo.len() >= LAYOUT_MEMO {
+        memo.clear();
+    }
+    memo.insert(index, Arc::clone(&layout));
+    Ok(layout)
+}
+
+/// The text an internal link points at (see the section comment). `label`
+/// is the link's own text on the source page; its digits select "[N]".
+pub fn link_entry(
+    doc: &Doc,
+    dest_page: u32,
+    dest_x: Option<f32>,
+    dest_y: f32,
+    label: &str,
+) -> Result<Option<LinkEntry>, String> {
+    let count = doc.doc.pages().len().max(0) as u32;
+    if dest_page >= count || !dest_y.is_finite() {
+        return Ok(None);
+    }
+    let mut get = |p: u32| -> Option<Arc<PageLayout>> {
+        if p >= count { None } else { page_layout(doc, p).ok() }
+    };
+    Ok(entry_from_layouts(&mut get, count, dest_page, dest_x.filter(|x| x.is_finite()), dest_y, label))
+}
+
+/// Visible text under a display-space box (a link's label): chars whose
+/// centre lies inside it, whitespace-normalized.
+pub fn text_in_box(text: &TextPage, r: &Region) -> String {
+    let mut out = String::new();
+    for (i, ch) in text.chars.iter().enumerate() {
+        let (cx, cy) = (ch.x + ch.w / 2.0, ch.y + ch.h / 2.0);
+        if (ch.w > 0.0 || ch.h > 0.0)
+            && cx >= r.x - 1.0
+            && cx <= r.x + r.w + 1.0
+            && cy >= r.y - 1.0
+            && cy <= r.y + r.h + 1.0
+        {
+            out.push_str(&ch.c);
+            if text.line_breaks.binary_search(&(i as u32)).is_ok() {
+                out.push(' ');
+            }
+        }
+    }
+    out.replace(['\u{2}', '\u{AD}'], "").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 // ── Metadata ──
@@ -1337,6 +2449,26 @@ pub async fn pdfium_links(app: AppHandle, id: u32, page: u32) -> Result<Vec<Link
     .await
 }
 
+/// Citation hover card: the bibliography entry (or caption / first line)
+/// a page link points at. Arguments are the link's `destPage` / `destX` /
+/// `destY` and its label text on the source page.
+#[tauri::command]
+pub async fn pdfium_link_entry(
+    app: AppHandle,
+    id: u32,
+    dest_page: u32,
+    dest_x: Option<f32>,
+    dest_y: f32,
+    label: String,
+) -> Result<Option<LinkEntry>, String> {
+    blocking(move || {
+        engine(&app)?;
+        let doc = lookup(id)?;
+        link_entry(&doc, dest_page, dest_x, dest_y, &label)
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn pdfium_metadata(app: AppHandle, id: u32) -> Result<Metadata, String> {
     blocking(move || {
@@ -1531,5 +2663,119 @@ mod tests {
         let f = frame(3);
         assert_eq!(f.to_display(tl.0, tl.1), (0.0, 510.0));
         assert_eq!(f.to_display(tr.0, tr.1), (0.0, 0.0));
+    }
+
+    /// Lines `(x, y_top, text, font)` as a TextPage with 5-pt-wide chars.
+    fn layout_of(lines: &[(f32, f32, &str, f32)]) -> Arc<PageLayout> {
+        let mut chars = Vec::new();
+        let mut breaks = Vec::new();
+        for &(x, y, text, font) in lines {
+            for (i, c) in text.chars().enumerate() {
+                chars.push(TextChar {
+                    c: c.to_string(),
+                    x: x + i as f32 * 5.0,
+                    y,
+                    w: 5.0,
+                    h: 10.0,
+                    font_size: font,
+                    rot: 0,
+                });
+            }
+            breaks.push(chars.len() as u32 - 1);
+        }
+        breaks.pop();
+        Arc::new(PageLayout::build(&TextPage { chars, line_breaks: breaks }, 612.0, 792.0))
+    }
+
+    fn entry(pages: &[Arc<PageLayout>], page: u32, x: Option<f32>, y: f32, label: &str) -> Option<LinkEntry> {
+        let mut get = |p: u32| pages.get(p as usize).cloned();
+        entry_from_layouts(&mut get, pages.len() as u32, page, x, y, label)
+    }
+
+    #[test]
+    fn numbered_entry_is_dehyphenated_and_continues_into_next_column() {
+        let page = layout_of(&[
+            (50.0, 100.0, "References", 14.0),
+            (50.0, 120.0, "[1] A. Author. Title one. In CVPR,", 10.0),
+            (62.0, 132.0, "2020.", 10.0),
+            (50.0, 144.0, "[2] B. Author. Segmen-", 10.0),
+            (62.0, 156.0, "tation of things. In ICCV,", 10.0),
+            (62.0, 168.0, "2021.", 10.0),
+            (50.0, 180.0, "[3] C. Author. A long entry that", 10.0),
+            (62.0, 192.0, "runs off the column", 10.0),
+            (332.0, 120.0, "bottom into the next. In ECCV, 2022.", 10.0),
+            (320.0, 132.0, "[4] D. Author. Four. In NeurIPS, 2023.", 10.0),
+            (332.0, 144.0, "Extra line.", 10.0),
+            (320.0, 156.0, "[5] E. Author. Five.", 10.0),
+            (332.0, 168.0, "More.", 10.0),
+        ]);
+        assert_eq!(page.cols.len(), 2);
+        let pages = [page];
+        let e = entry(&pages, 0, Some(50.0), 140.0, "[2]").unwrap();
+        assert_eq!(e.kind, "reference");
+        assert_eq!(e.text, "[2] B. Author. Segmentation of things. In ICCV, 2021.");
+        let e = entry(&pages, 0, None, 176.0, "3,").unwrap();
+        assert_eq!(e.text, "[3] C. Author. A long entry that runs off the column bottom into the next. In ECCV, 2022.");
+        // Box = union over both columns' lines.
+        assert_eq!((e.x, e.y), (50.0, 120.0));
+    }
+
+    #[test]
+    fn author_year_entry_uses_dest_x_column_and_hanging_indent() {
+        let pages = [layout_of(&[
+            (50.0, 80.0, "References", 14.0),
+            (50.0, 100.0, "ALPHA, A. 2001. First paper tit", 10.0),
+            (60.0, 112.0, "goes on. In Proc.", 10.0),
+            (50.0, 124.0, "BETA, B. 2002. Second paper tit", 10.0),
+            (60.0, 136.0, "more words.", 10.0),
+            (50.0, 148.0, "GAMMA, C. 2003. Third paper tit", 10.0),
+            (60.0, 160.0, "tail text.", 10.0),
+            (320.0, 100.0, "DELTA, D. 2004. Fourth paper ti", 10.0),
+            (330.0, 112.0, "continues.", 10.0),
+            (320.0, 124.0, "EPS, E. 2005. Fifth paper title", 10.0),
+            (330.0, 136.0, "fifth tail.", 10.0),
+            (320.0, 148.0, "ZETA, F. 2006. Sixth paper titl", 10.0),
+            (330.0, 160.0, "sixth tail.", 10.0),
+        ])];
+        // Dest sits 15 pt left of the right column (hanging list margin),
+        // level with BETA in the left column.
+        let e = entry(&pages, 0, Some(305.0), 120.0, "Eps 2005").unwrap();
+        assert_eq!(e.kind, "reference");
+        assert_eq!(e.text, "EPS, E. 2005. Fifth paper title fifth tail.");
+        let e = entry(&pages, 0, Some(35.0), 120.0, "Beta 2002").unwrap();
+        assert_eq!(e.text, "BETA, B. 2002. Second paper tit more words.");
+    }
+
+    #[test]
+    fn figure_target_returns_caption_sentence() {
+        let body = "Body text body text body text body text body text body text body text body text x";
+        let pages = [layout_of(&[
+            (50.0, 100.0, body, 10.0),
+            (50.0, 112.0, body, 10.0),
+            (50.0, 124.0, body, 10.0),
+            (50.0, 400.0, "Figure 3: Overview of the pipeline. Given an input image we", 10.0),
+            (50.0, 412.0, "predict things.", 10.0),
+        ])];
+        let e = entry(&pages, 0, Some(50.0), 96.0, "3").unwrap();
+        assert_eq!(e.kind, "other");
+        assert_eq!(e.text, "Figure 3: Overview of the pipeline.");
+        assert_eq!(e.y, 400.0);
+        // A dest x of 0 is ignored rather than picking a column.
+        assert!(pages[0].column_at(0.0).is_none());
+    }
+
+    #[test]
+    fn line_joins_dehyphenate_only_real_word_breaks() {
+        assert_eq!(join_lines(["segmen-", "tation"]), "segmentation");
+        assert_eq!(join_lines(["Boundary-", "Aware"]), "Boundary-Aware");
+        assert_eq!(join_lines(["Pro\u{AD}", "ceedings"]), "Proceedings");
+        assert_eq!(join_lines(["mini\u{2}", "mization"]), "minimization");
+        assert_eq!(join_lines(["pp. 1\u{2013}", "10"]), "pp. 1\u{2013}10");
+        assert_eq!(join_lines(["Pro", "ceedings"]), "Pro ceedings");
+        assert_eq!(label_number("[47]"), Some("47"));
+        assert_eq!(label_number("4.1"), None);
+        assert!(is_references_heading("7. R EFERENCES"));
+        assert!(is_references_heading("References"));
+        assert!(!is_references_heading("References to prior work are"));
     }
 }

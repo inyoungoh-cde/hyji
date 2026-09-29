@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type TextSize = "normal" | "large" | "xlarge";
 export type PdfRenderEngine = "pdfium" | "pdfjs";
+export interface CiteFields { authors: boolean; title: boolean; venue: boolean; year: boolean }
 
 // Startup layout preference — what the panels look like when HYJI launches.
 // "remember": restore whatever the user had last session.
@@ -120,6 +121,9 @@ interface UiState {
   /** Tools → Auto Fit Width on Open (3.3, default on): a paper opened in a
    *  tab that has no zoom of its own yet starts at fit-width instead of 100 %. */
   autoFitOnOpen: boolean;
+  /** View → Citation Preview on Hover (3.4): which fields the card over an
+   *  in-text citation link shows. All off = no card. */
+  citeFields: CiteFields;
   focusMode: boolean;
   preFocusState: PreFocusState | null;
 
@@ -145,6 +149,7 @@ interface UiState {
   setPdfiumTextDarkening: (v: number) => void;
   setPdfRenderEngine: (e: PdfRenderEngine) => void;
   toggleAutoFitOnOpen: () => void;
+  toggleCiteField: (field: keyof CiteFields) => void;
   enterFocusMode: (snapshot: PreFocusState) => void;
   exitFocusMode: () => PreFocusState | null;
 }
@@ -207,6 +212,12 @@ export const useUiStore = create<UiState>((set, get) => ({
   pdfiumTextDarkening: loadDarkening("hyji:pdfium-text-darkening", 0),
   pdfRenderEngine: loadPdfRenderEngine(),
   autoFitOnOpen: loadBool("hyji:auto-fit-on-open", true),
+  citeFields: {
+    authors: loadBool("hyji:cite-authors", true),
+    title: loadBool("hyji:cite-title", true),
+    venue: loadBool("hyji:cite-venue", true),
+    year: loadBool("hyji:cite-year", true),
+  },
   focusMode: false,
   preFocusState: null,
 
@@ -306,6 +317,12 @@ export const useUiStore = create<UiState>((set, get) => ({
     try { localStorage.setItem("hyji:pdf-render-engine", e); } catch { /* ignore */ }
     set({ pdfRenderEngine: e });
   },
+  toggleCiteField: (field) =>
+    set((s) => {
+      const next = { ...s.citeFields, [field]: !s.citeFields[field] };
+      persistPanel(`hyji:cite-${field}`, next[field]);
+      return { citeFields: next };
+    }),
   toggleAutoFitOnOpen: () =>
     set((s) => {
       persistPanel("hyji:auto-fit-on-open", !s.autoFitOnOpen);

@@ -63,6 +63,35 @@ export interface PdfiumLink {
   destPage?: number;
   /** Display-y on the target page (unclamped — clamp to [0, pageHeight]). */
   destY?: number;
+  /** Display-x on the target page when the destination carries one (3.4). */
+  destX?: number;
+}
+
+/** The text a link points at (3.4): a bibliography entry, or for figure /
+ *  section / footnote targets the first line or caption sentence. */
+export interface PdfiumLinkEntry {
+  text: string;
+  kind: "reference" | "other";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export function pdfiumLinkEntry(
+  id: number,
+  destPage: number,
+  destX: number | undefined,
+  destY: number,
+  label: string
+): Promise<PdfiumLinkEntry | null> {
+  return invoke<PdfiumLinkEntry | null>("pdfium_link_entry", {
+    id,
+    destPage,
+    destX: destX ?? null,
+    destY,
+    label,
+  }).catch(() => null);
 }
 
 /** Char index range [start, end) into PdfiumTextPage.chars. */

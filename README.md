@@ -51,6 +51,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 - **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in under a second: files over 20 MB are streamed to the viewer by ranges on demand instead of being read whole.
 - **Hinted, pixel-exact text on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge) and displayed 1:1 on device pixels; since 3.2 the text layer, selection boxes, links and search come from the same engine, so highlights land exactly on the glyphs. It is displayed so stroke weight is uniform and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling. Preferences → *PDF render engine* switches to the classic pdf.js renderer if a document ever needs it (the app also falls back automatically when the PDFium library is unavailable), and *PDF text rendering* adds optional stem darkening per engine (Off / Subtle / Standard / Strong — PDFium defaults to Off, the crispest).
 - **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors.
+- **Citation preview on hover** — Rest the pointer on a citation like [47] to see the paper it refers to (first author et al., title, abbreviated venue such as ECCV, year) without leaving the page; View → Citation Preview on Hover picks the fields. Click still jumps to the reference with *Back to reading*.
 - **Multi-tab reading** — Several papers in browser-style tabs; each tab remembers its zoom and reading position, and open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a tab in the running app.
 - **Print** (Ctrl+P) — High-resolution print with your highlights, underlines and memos burned in, rendered by the same engine as the screen.
 
@@ -229,6 +230,11 @@ Please keep PRs focused — one feature or fix per PR.
 
 The three most recent releases; every release since 0.1 is in [CHANGELOG.md](./CHANGELOG.md) (releases before 2.0 were renumbered to a two-part scheme there — original git tags are unchanged).
 
+### v3.4 (Sep 2026)
+- Hover an in-text citation like [47] to see the referenced paper — first author et al., title, abbreviated venue (e.g. ECCV) and year — in a small card; choose the fields in View → Citation Preview on Hover. Click still jumps to the bibliography with Back to reading
+- Bibliography entries found for every reference link in a 12-paper test library (numbered and author-year styles); field split verified at ≥ 99 % on 343 hand-checked entries
+- Venue name list extended to 302 entries with common aliases
+
 ### v3.3 (Sep 2026)
 - Tools → Auto Fit Width on Open (on by default): papers open at fit-width; uncheck to open at 1:1
 - Dashboard → Projects shows the folder hierarchy (parent → child, indented, subtree paper counts) instead of flat chips
@@ -238,11 +244,7 @@ The three most recent releases; every release since 0.1 is in [CHANGELOG.md](./C
 - PDFium is now the viewer's only engine: text selection, highlights, links, search, printing and text extraction all use it (pdf.js stays as the selectable classic renderer / automatic fallback). Selection boxes now come from the same engine that draws the glyphs; papers are no longer parsed twice (260 MB volume: ~65 MB main process + ~210 MB WebView while open); any zoom level renders via strip rendering; printing keeps highlight colours and holds nothing in JS memory
 - Help → Check for Updates… (one request to github.com, only when clicked) with in-app download & install; optional check at launch (off by default, disabled in offline mode). Installing a newer .msi over an older one upgrades in place — no uninstall needed
 
-### v3.1 (Sep 2026)
-- Fixed 3.0 text looking soft: the page bitmap was resampled by a fraction of a pixel by the compositor; it is now displayed pixel-exact (portrait Focus Mode now matches the engine's own render 1:1)
-- PDFium stem darkening defaults to Off (crispest, Edge-like); Subtle / Standard / Strong remain selectable
-
-Older releases (3.0 → 0.1) are in the **[full changelog](./CHANGELOG.md)**.
+Older releases (3.1 → 0.1) are in the **[full changelog](./CHANGELOG.md)**.
 
 ---
 

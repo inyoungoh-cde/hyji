@@ -25,14 +25,17 @@ fn set_export_selected_enabled(state: State<'_, ExportSelectedItem>, enabled: bo
     let _ = state.0.set_enabled(enabled);
 }
 
-/// Handle to Tools > Auto Fit Width on Open (a check item). The preference
-/// itself lives in the frontend (localStorage); the frontend pushes it here
-/// at startup and after every toggle so the check mark always matches.
-pub struct AutoFitItem(pub tauri::menu::CheckMenuItem<tauri::Wry>);
+/// Native check items by menu id (Tools > Auto Fit Width on Open,
+/// View > Citation Preview on Hover > ...). The preferences themselves live in
+/// the frontend (localStorage); the frontend pushes each value here at startup
+/// and after every toggle so the check marks always match.
+pub struct MenuChecks(pub std::collections::HashMap<String, tauri::menu::CheckMenuItem<tauri::Wry>>);
 
 #[tauri::command]
-fn set_auto_fit_checked(state: State<'_, AutoFitItem>, checked: bool) {
-    let _ = state.0.set_checked(checked);
+fn set_menu_checked(state: State<'_, MenuChecks>, id: String, checked: bool) {
+    if let Some(item) = state.0.get(&id) {
+        let _ = item.set_checked(checked);
+    }
 }
 
 #[tauri::command]
@@ -111,9 +114,10 @@ pub fn run() {
             pdfium::pdfium_page_text,
             pdfium::pdfium_search,
             pdfium::pdfium_links,
+            pdfium::pdfium_link_entry,
             pdfium::pdfium_metadata,
             set_export_selected_enabled,
-            set_auto_fit_checked,
+            set_menu_checked,
             take_pending_open_files,
             get_backup_config,
             set_backup_config,
@@ -167,7 +171,30 @@ pub fn run() {
             let auto_fit_item = CheckMenuItemBuilder::with_id("auto-fit", "Auto Fit Width on Open")
                 .checked(true)
                 .build(app)?;
-            app.manage(AutoFitItem(auto_fit_item.clone()));
+
+            // View > Citation Preview on Hover: which fields the card shows
+            // when the pointer rests on an in-text citation link.
+            let cite_items = [
+                ("cite-authors", "Authors (First Author et al.)"),
+                ("cite-title", "Title"),
+                ("cite-venue", "Venue (Abbreviated, e.g. ECCV)"),
+                ("cite-year", "Year"),
+            ]
+            .into_iter()
+            .map(|(id, label)| CheckMenuItemBuilder::with_id(id, label).checked(true).build(app))
+            .collect::<Result<Vec<_>, _>>()?;
+            let mut cite_sub = SubmenuBuilder::new(app, "Citation Preview on Hover");
+            for item in &cite_items {
+                cite_sub = cite_sub.item(item);
+            }
+            let cite_menu = cite_sub.build()?;
+
+            let mut checks = std::collections::HashMap::new();
+            checks.insert("auto-fit".to_string(), auto_fit_item.clone());
+            for item in &cite_items {
+                checks.insert(item.id().0.clone(), item.clone());
+            }
+            app.manage(MenuChecks(checks));
 
             let edit_menu = SubmenuBuilder::new(app, "Edit")
                 .undo()
@@ -194,6 +221,8 @@ pub fn run() {
                 .text("dashboard", "Dashboard\tCtrl+H")
                 .text("expand-metadata", "Expand Metadata\tCtrl+M")
                 .text("keyword-graph", "Keyword Graph\tCtrl+G")
+                .separator()
+                .item(&cite_menu)
                 .separator()
                 .text("text-size-normal", "Text Size: Default")
                 .text("text-size-large",  "Text Size: Large")
