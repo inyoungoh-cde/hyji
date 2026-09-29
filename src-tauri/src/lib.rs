@@ -25,6 +25,16 @@ fn set_export_selected_enabled(state: State<'_, ExportSelectedItem>, enabled: bo
     let _ = state.0.set_enabled(enabled);
 }
 
+/// Handle to Tools > Auto Fit Width on Open (a check item). The preference
+/// itself lives in the frontend (localStorage); the frontend pushes it here
+/// at startup and after every toggle so the check mark always matches.
+pub struct AutoFitItem(pub tauri::menu::CheckMenuItem<tauri::Wry>);
+
+#[tauri::command]
+fn set_auto_fit_checked(state: State<'_, AutoFitItem>, checked: bool) {
+    let _ = state.0.set_checked(checked);
+}
+
 #[tauri::command]
 fn take_pending_open_files(state: State<'_, PendingOpenFile>) -> Vec<String> {
     state
@@ -103,6 +113,7 @@ pub fn run() {
             pdfium::pdfium_links,
             pdfium::pdfium_metadata,
             set_export_selected_enabled,
+            set_auto_fit_checked,
             take_pending_open_files,
             get_backup_config,
             set_backup_config,
@@ -126,7 +137,7 @@ pub fn run() {
             window.set_icon(icon)?;
 
             // Create menu
-            use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+            use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 
             // Kept as a handle so the frontend can gray it out while nothing
             // is selected (starts disabled — no selection at launch).
@@ -150,6 +161,13 @@ pub fn run() {
                 .build()?;
 
             app.manage(ExportSelectedItem(export_selected_item));
+
+            // Checked by default; the frontend corrects it from the saved
+            // preference as soon as it loads.
+            let auto_fit_item = CheckMenuItemBuilder::with_id("auto-fit", "Auto Fit Width on Open")
+                .checked(true)
+                .build(app)?;
+            app.manage(AutoFitItem(auto_fit_item.clone()));
 
             let edit_menu = SubmenuBuilder::new(app, "Edit")
                 .undo()
@@ -187,6 +205,8 @@ pub fn run() {
                 .text("regen-keywords", "Regenerate Keywords")
                 .text("import-annotations", "Import Annotations from PDF...")
                 .text("rebuild-search-index", "Rebuild Search Index...")
+                .separator()
+                .item(&auto_fit_item)
                 .separator()
                 .text("db-backup", "Database Backup...")
                 .text("db-restore", "Restore from Backup...")

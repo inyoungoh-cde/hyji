@@ -47,7 +47,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 ### Reading
 
-- **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, fit width), clickable hyperlinks and internal reference links with a "Back to reading" button, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK fonts).
+- **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, fit width — papers open fitted by default, Tools → Auto Fit Width on Open), clickable hyperlinks and internal reference links with a "Back to reading" button, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK fonts).
 - **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in under a second: files over 20 MB are streamed to the viewer by ranges on demand instead of being read whole.
 - **Hinted, pixel-exact text on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge) and displayed 1:1 on device pixels; since 3.2 the text layer, selection boxes, links and search come from the same engine, so highlights land exactly on the glyphs. It is displayed so stroke weight is uniform and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling. Preferences → *PDF render engine* switches to the classic pdf.js renderer if a document ever needs it (the app also falls back automatically when the PDFium library is unavailable), and *PDF text rendering* adds optional stem darkening per engine (Off / Subtle / Standard / Strong — PDFium defaults to Off, the crispest).
 - **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors.
@@ -68,7 +68,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 - **Multi-select** — Ctrl+click, Shift+click ranges; right-click to move or delete the whole selection, Delete key, drag them all at once.
 - **Swipe gestures** — Drag a paper row left to reveal Delete (all the way for the confirmation directly); drag right to toggle ⚑ Revisit.
 - **Keyword graph** — D3 force-directed graph of keyword co-occurrence (auto-extracted from PDF metadata, editable per paper); click a node to filter, Ctrl+G for full screen.
-- **Dashboard** — Home screen with recent papers, level/revisit counts, project shortcuts and quick actions.
+- **Dashboard** — Home screen with recent papers, level/revisit counts, the project folder tree (with paper counts per folder) and quick actions.
 
 ### Metadata & export
 
@@ -229,6 +229,11 @@ Please keep PRs focused — one feature or fix per PR.
 
 The three most recent releases; every release since 0.1 is in [CHANGELOG.md](./CHANGELOG.md) (releases before 2.0 were renumbered to a two-part scheme there — original git tags are unchanged).
 
+### v3.3 (Sep 2026)
+- Tools → Auto Fit Width on Open (on by default): papers open at fit-width; uncheck to open at 1:1
+- Dashboard → Projects shows the folder hierarchy (parent → child, indented, subtree paper counts) instead of flat chips
+- First installer with the 3.2 changes (its CI build had failed on a package-version mismatch)
+
 ### v3.2 (Sep 2026)
 - PDFium is now the viewer's only engine: text selection, highlights, links, search, printing and text extraction all use it (pdf.js stays as the selectable classic renderer / automatic fallback). Selection boxes now come from the same engine that draws the glyphs; papers are no longer parsed twice (260 MB volume: ~65 MB main process + ~210 MB WebView while open); any zoom level renders via strip rendering; printing keeps highlight colours and holds nothing in JS memory
 - Help → Check for Updates… (one request to github.com, only when clicked) with in-app download & install; optional check at launch (off by default, disabled in offline mode). Installing a newer .msi over an older one upgrades in place — no uninstall needed
@@ -237,13 +242,7 @@ The three most recent releases; every release since 0.1 is in [CHANGELOG.md](./C
 - Fixed 3.0 text looking soft: the page bitmap was resampled by a fraction of a pixel by the compositor; it is now displayed pixel-exact (portrait Focus Mode now matches the engine's own render 1:1)
 - PDFium stem darkening defaults to Off (crispest, Edge-like); Subtle / Standard / Strong remain selectable
 
-### v3.0 (Sep 2026)
-- New page renderer: PDFium (Chrome/Edge's engine) replaces pdf.js rasterization — hinted, uniform strokes on standard-DPI monitors, which fixes the grainy/smeared text when reading in Focus Mode on a 100 %-scale portrait display; text selection, links, search and annotations stay on pdf.js
-- Verified against pdf.js with a new render-integrity harness (`tools/render-verify/`): 110 pages across 12 real papers and synthetic rotation / CropBox / annotation / scanned / mixed-size fixtures — nothing pdf.js drew is missing (≤ 0.002 % ink), identical pixel sizes
-- 260 MB proceedings volume: open ~15 ms, ~30 MB memory, ~6 ms per page
-- Preferences → PDF render engine (PDFium / pdf.js classic) with automatic fallback; stem darkening remembered per engine (PDFium default Standard 0.35 ≈ Edge/Acrobat weight)
-
-Older releases (2.8 → 0.1) are in the **[full changelog](./CHANGELOG.md)**.
+Older releases (3.0 → 0.1) are in the **[full changelog](./CHANGELOG.md)**.
 
 ---
 

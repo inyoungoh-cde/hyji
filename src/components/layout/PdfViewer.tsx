@@ -109,8 +109,24 @@ export function PdfViewer() {
     }
   }, [papers, openPaperIds, closePaperTab]);
 
+  // Tools → Auto Fit Width on Open (3.3): set when a paper becomes the active
+  // tab without a zoom of its own this session; consumed once its first page
+  // width arrives, so the paper opens at fit-width instead of 100 %.
+  const pendingAutoFitRef = useRef(false);
+
   const handlePageWidth = useCallback((w: number) => {
     pageWidthRef.current = w;
+    if (!pendingAutoFitRef.current) return;
+    pendingAutoFitRef.current = false;
+    if (!useUiStore.getState().autoFitOnOpen || useUiStore.getState().focusMode) return;
+    // The viewer column may still be laying out (first paint after launch);
+    // measure on the next frame.
+    requestAnimationFrame(() => {
+      if (!viewerRef.current || !pageWidthRef.current) return;
+      const w2 = viewerRef.current.clientWidth;
+      if (w2 <= 0) return;
+      setScale(Math.max(0.25, Math.round((w2 / pageWidthRef.current) * 100) / 100));
+    });
   }, []);
 
   const handleFitWidth = useCallback(() => {
@@ -243,6 +259,14 @@ export function PdfViewer() {
     if (activePaperId) {
       const saved = tabScaleMemory.current.get(activePaperId);
       if (saved !== undefined) setScale(saved);
+      // No zoom chosen for this tab yet → fit it once its page width is known
+      // (Auto Fit Width on Open), or start at 1:1 when that option is off —
+      // never inherit the previous tab's zoom, which made the opening size
+      // depend on whatever was viewed last.
+      pendingAutoFitRef.current = saved === undefined;
+      if (saved === undefined && !useUiStore.getState().autoFitOnOpen && !useUiStore.getState().focusMode) {
+        setScale(1);
+      }
     }
     // A rename in progress belongs to the previous tab — abandon it.
     setEditingTabTitle(false);

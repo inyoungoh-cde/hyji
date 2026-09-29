@@ -117,6 +117,9 @@ interface UiState {
    *  (falls back to "pdfjs" when the DLL is unavailable); "pdfjs" = the
    *  classic pre-3.0 viewer. */
   pdfRenderEngine: PdfRenderEngine;
+  /** Tools → Auto Fit Width on Open (3.3, default on): a paper opened in a
+   *  tab that has no zoom of its own yet starts at fit-width instead of 100 %. */
+  autoFitOnOpen: boolean;
   focusMode: boolean;
   preFocusState: PreFocusState | null;
 
@@ -141,6 +144,7 @@ interface UiState {
   setPdfTextDarkening: (v: number) => void;
   setPdfiumTextDarkening: (v: number) => void;
   setPdfRenderEngine: (e: PdfRenderEngine) => void;
+  toggleAutoFitOnOpen: () => void;
   enterFocusMode: (snapshot: PreFocusState) => void;
   exitFocusMode: () => PreFocusState | null;
 }
@@ -202,6 +206,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   pdfTextDarkening: loadDarkening("hyji:pdf-text-darkening", 0.65),
   pdfiumTextDarkening: loadDarkening("hyji:pdfium-text-darkening", 0),
   pdfRenderEngine: loadPdfRenderEngine(),
+  autoFitOnOpen: loadBool("hyji:auto-fit-on-open", true),
   focusMode: false,
   preFocusState: null,
 
@@ -301,6 +306,11 @@ export const useUiStore = create<UiState>((set, get) => ({
     try { localStorage.setItem("hyji:pdf-render-engine", e); } catch { /* ignore */ }
     set({ pdfRenderEngine: e });
   },
+  toggleAutoFitOnOpen: () =>
+    set((s) => {
+      persistPanel("hyji:auto-fit-on-open", !s.autoFitOnOpen);
+      return { autoFitOnOpen: !s.autoFitOnOpen };
+    }),
   togglePdfDarkMode: () =>
     set((s) => {
       persistPanel("hyji:pdf-dark", !s.pdfDarkMode);

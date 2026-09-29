@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, Fragment } from "react";
 import { usePapersStore } from "../../stores/papers";
 import { useProjectsStore } from "../../stores/projects";
 import { useUiStore } from "../../stores/ui";
-import type { Paper } from "../../types";
+import type { Paper, Project } from "../../types";
 import { LEVEL_COLOR, REVISIT_COLOR } from "../../lib/level";
 import { LevelBadge, RevisitBadge } from "../shared/LevelBadge";
 
@@ -54,6 +54,28 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
   const handleProjectClick = (projectId: string) => {
     setSelectedProject(projectId);
   };
+
+  // Papers per folder: `own` = directly inside, `total` = including every
+  // subfolder. The row shows `total` (what a folder holds); the tooltip
+  // breaks it down for folders that have subfolders.
+  const folderCounts = useMemo(() => {
+    const own = new Map<string, number>();
+    for (const p of papers) {
+      if (p.project_id) own.set(p.project_id, (own.get(p.project_id) ?? 0) + 1);
+    }
+    const total = new Map<string, number>();
+    const sum = (id: string, seen: Set<string>): number => {
+      if (total.has(id)) return total.get(id)!;
+      if (seen.has(id)) return 0; // defensive: a cycle in parent_id
+      seen.add(id);
+      let n = own.get(id) ?? 0;
+      for (const c of projects) if (c.parent_id === id) n += sum(c.id, seen);
+      total.set(id, n);
+      return n;
+    };
+    for (const pr of projects) sum(pr.id, new Set());
+    return { own, total };
+  }, [papers, projects]);
 
   return (
     <div className="h-full overflow-y-auto bg-bg-primary">
@@ -116,27 +138,19 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
           </section>
         )}
 
-        {/* Projects */}
+        {/* Projects — the same folder hierarchy as the sidebar / "Move to"
+            menu: each level indented under a guide line (3.3). */}
         {projects.length > 0 && (
           <section className="mb-10">
             <SectionHeader>Projects</SectionHeader>
-            <div className="flex gap-2 flex-wrap mt-3">
-              {projects.map((proj) => {
-                const count = papers.filter((p) => p.project_id === proj.id).length;
-                return (
-                  <button
-                    key={proj.id}
-                    onClick={() => handleProjectClick(proj.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-border bg-bg-secondary hover:border-accent/40 hover:bg-bg-tertiary transition-colors text-small text-text-secondary hover:text-text-primary"
-                  >
-                    <span className="text-section">📁</span>
-                    <span>{proj.name}</span>
-                    {count > 0 && (
-                      <span className="text-caption text-text-tertiary ml-0.5">{count}</span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="mt-3 rounded-[10px] border border-border bg-bg-secondary py-1.5">
+              <ProjectTreeLevel
+                projects={projects}
+                parentId={null}
+                depth={0}
+                counts={folderCounts}
+                onPick={handleProjectClick}
+              />
             </div>
           </section>
         )}
@@ -185,6 +199,61 @@ export function Dashboard({ onImportPdf, onSmartPaste }: DashboardProps) {
         )}
 
       </div>
+    </div>
+  );
+}
+
+function ProjectTreeLevel({
+  projects,
+  parentId,
+  depth,
+  counts,
+  onPick,
+}: {
+  projects: Project[];
+  parentId: string | null;
+  depth: number;
+  counts: { own: Map<string, number>; total: Map<string, number> };
+  onPick: (projectId: string) => void;
+}) {
+  const children = projects
+    .filter((p) => p.parent_id === parentId)
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  if (children.length === 0) return null;
+  return (
+    <div className={depth > 0 ? "ml-[22px] border-l border-border/70" : ""}>
+      {children.map((p) => {
+        const own = counts.own.get(p.id) ?? 0;
+        const total = counts.total.get(p.id) ?? 0;
+        const hasChildren = projects.some((c) => c.parent_id === p.id);
+        return (
+          <Fragment key={p.id}>
+            <button
+              onClick={() => onPick(p.id)}
+              className="w-full text-left pr-4 py-1 flex items-center gap-2 text-small text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+              style={{ paddingLeft: depth === 0 ? 14 : 10 }}
+              title={
+                hasChildren
+                  ? `${total} paper${total === 1 ? "" : "s"} including subfolders (${own} directly in this folder)`
+                  : `${own} paper${own === 1 ? "" : "s"}`
+              }
+            >
+              <span className="text-section flex-shrink-0">📁</span>
+              <span className="truncate flex-1 min-w-0">{p.name}</span>
+              {total > 0 && (
+                <span className="text-caption text-text-tertiary flex-shrink-0 tabular-nums">{total}</span>
+              )}
+            </button>
+            <ProjectTreeLevel
+              projects={projects}
+              parentId={p.id}
+              depth={depth + 1}
+              counts={counts}
+              onPick={onPick}
+            />
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

@@ -7,7 +7,20 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
-## [3.2] - 2026-09-29
+## [3.3] - 2026-09-29
+
+3.3 is the first installer to carry the 3.2 changes below — the 3.2 release build failed in CI (the npm `@tauri-apps/api`, `plugin-updater` and `plugin-process` packages had drifted to newer minor versions than their Rust crates, which the Tauri CLI refuses to bundle). The JS packages are now pinned to the crates' versions.
+
+### Added
+
+- **Tools → Auto Fit Width on Open** (a check item, **on by default**). A paper opened in a tab you haven't zoomed yet starts at fit-width instead of 100 %, so you no longer have to press Fit every time you open a file or restart the app. Uncheck it to open papers at 1:1 (100 %) — each tab still remembers the zoom you set on it for the rest of the session, and Focus Mode keeps fitting as before. The setting is remembered across launches.
+
+### Changed
+
+- **Dashboard → Projects shows the real folder tree.** Instead of a flat row of folder chips, projects are listed in the same parent → child hierarchy as the sidebar and the "Move to" menu, each level indented under a guide line. The number next to a folder is the papers it holds including its subfolders; hover a folder to see how many are directly inside it. Click a folder to select it, as before.
+- A newly opened tab no longer inherits the previous tab's zoom level; its starting size is always either fit-width or 1:1, depending on the option above.
+
+## [3.2] - 2026-09-29 (not released — shipped in 3.3)
 
 ### Changed
 

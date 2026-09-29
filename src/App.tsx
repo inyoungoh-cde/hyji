@@ -108,9 +108,19 @@ export default function App() {
       onMenuEvent("text-size-normal", () => setTextSize("normal")),
       onMenuEvent("text-size-large",  () => setTextSize("large")),
       onMenuEvent("text-size-xlarge", () => setTextSize("xlarge")),
+      // Tools → Auto Fit Width on Open. The native check item flips its own
+      // mark on click; the store is the source of truth and re-syncs it.
+      onMenuEvent("auto-fit", () => useUiStore.getState().toggleAutoFitOnOpen()),
     ];
     return () => unsubs.forEach((fn) => fn());
   }, [toggleSidebar, toggleTracker, setTextSize]);
+
+  // Keep the Tools → Auto Fit Width on Open check mark equal to the saved
+  // preference (the Rust side builds it checked; this corrects it at launch).
+  const autoFitOnOpen = useUiStore((s) => s.autoFitOnOpen);
+  useEffect(() => {
+    invoke("set_auto_fit_checked", { checked: autoFitOnOpen }).catch(() => undefined);
+  }, [autoFitOnOpen]);
 
   // Global keyboard shortcuts
   useEffect(() => {
