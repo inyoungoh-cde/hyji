@@ -49,7 +49,7 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 - **PDF viewer** — Continuous scroll, zoom (Ctrl+wheel, fit width), clickable hyperlinks and internal reference links with a "Back to reading" button, print (Ctrl+P), Focus Mode (Ctrl+L) for distraction-free reading. Korean/Japanese/Chinese PDFs render correctly (bundled CJK fonts).
 - **Large files** — Proceedings volumes and scanned books (hundreds of MB) open in under a second: files over 20 MB are streamed to the viewer by ranges on demand instead of being read whole.
-- **Hinted, pixel-exact text on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge) and displayed 1:1 on device pixels, so stroke weight is uniform and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling. Preferences → *PDF render engine* switches to the classic pdf.js renderer if a document ever needs it (the app also falls back automatically when the PDFium library is unavailable), and *PDF text rendering* adds optional stem darkening per engine (Off / Subtle / Standard / Strong — PDFium defaults to Off, the crispest).
+- **Hinted, pixel-exact text on every monitor** — Pages are rasterized by PDFium (the engine inside Chrome and Edge) and displayed 1:1 on device pixels; since 3.2 the text layer, selection boxes, links and search come from the same engine, so highlights land exactly on the glyphs. It is displayed so stroke weight is uniform and Focus Mode on a 100 %-scale portrait display reads like Edge or Acrobat. Pages re-render when the window moves between displays with different scaling. Preferences → *PDF render engine* switches to the classic pdf.js renderer if a document ever needs it (the app also falls back automatically when the PDFium library is unavailable), and *PDF text rendering* adds optional stem darkening per engine (Off / Subtle / Standard / Strong — PDFium defaults to Off, the crispest).
 - **PDF dark mode** (Ctrl+D) — Inverted night reading that keeps figures and photos in their true colors.
 - **Multi-tab reading** — Several papers in browser-style tabs; each tab remembers its zoom and reading position, and open tabs are restored on the next launch. Double-clicking a PDF in Explorer opens it as a tab in the running app.
 - **Print** (Ctrl+P) — High-resolution print with your highlights, underlines and memos burned in, rendered by the same engine as the screen.
@@ -87,12 +87,14 @@ Other tools let you manage papers. HYJI lets you **think through** them.
 
 ## Privacy & Network Policy
 
-HYJI is local-first and makes **no automatic network requests**. In full:
+HYJI is local-first and makes **no automatic network requests** — the one launch-time update check is opt-in and off by default. In full:
 
 - **The only online feature is the metadata lookup** ("🌐 Fetch metadata"), and it runs only when you click it. It sends the paper's **DOI or arXiv ID — nothing else** — directly to `api.crossref.org` (Crossref, the non-profit DOI registry) or `export.arxiv.org` (arXiv, Cornell University) and reads back the public bibliographic record. These two domains are hard-coded as an allowlist in the Rust backend; the app cannot request any other host.
 - **Your PDFs, notes, highlights, and library never leave your computer.** There is no account, no telemetry, no proxy server — requests go straight from your machine to the non-profit source.
 - **Before the first lookup**, a one-time dialog explains exactly what will be sent; Cancel sends nothing.
-- **Offline mode** (Tools → Preferences… → Network & privacy) disables online features entirely — with it on, HYJI makes zero network requests.
+- **Update check** (Help → Check for Updates…) sends **one request to `github.com`** — the release feed of this repository — and only when you click it. Nothing about you or your library is sent; the reply is the newest version number and its release notes. Installing from that dialog downloads the signed installer from the same GitHub Releases page and verifies its signature before running it.
+- **Automatic check at launch is opt-in and off by default** (Preferences → Network & privacy → "Check for updates automatically at launch"). When on, HYJI makes that same single request to `github.com` about 5 s after launch and stays silent unless a newer version exists.
+- **Offline mode** (Tools → Preferences… → Network & privacy) disables online features entirely — with it on, HYJI makes zero network requests: metadata lookup is grayed out, and both the manual and the automatic update check are skipped before any request is made.
 
 ---
 
@@ -106,7 +108,12 @@ HYJI is local-first and makes **no automatic network requests**. In full:
 2. Double-click → Next → Next → Install → Finish
 3. Launch HYJI from the Start menu — or set it as the default `.pdf` app and double-click any PDF
 
-To update, download the newest installer from the Releases page and run it over the existing installation (your library, notes and settings are kept) — in line with the privacy policy above, HYJI does not phone home to check for updates.
+To update, either:
+
+- **Help → Check for Updates…** inside HYJI — one request to `github.com` when you click it; if a newer version exists you see its release notes and can download and install it from the dialog (the app restarts into the new version). An automatic check at launch is available as an opt-in in Preferences → Network & privacy, off by default.
+- **Or download the newest `.msi` from the Releases page and run it over the existing installation.** The installer is built as a Windows Installer *major upgrade*: it replaces the previous version in place (no need to uninstall first, and installing an older version is refused). Your library, notes and settings live in your app-data folder and are kept.
+
+In line with the privacy policy above, HYJI never checks for updates unless you click the menu item or turn the launch-time check on.
 
 ---
 
@@ -141,8 +148,8 @@ Color is only a secondary cue (gray → orange → red for the level, yellow for
 | Framework | Tauri v2 (Rust + WebView2) |
 | Frontend | React 18 + TypeScript |
 | Styling | Tailwind CSS |
-| PDF rasterization | PDFium (Chromium) via `pdfium-render`, pdf.js as fallback |
-| PDF text layer / search | pdf.js (Mozilla) |
+| PDF engine | PDFium (Chromium) via `pdfium-render` — rendering, text layer, links, search, text extraction |
+| Classic renderer / fallback | pdf.js (Mozilla) |
 | Database | SQLite via tauri-plugin-sql |
 | State | Zustand |
 | Build | Vite |
@@ -222,6 +229,10 @@ Please keep PRs focused — one feature or fix per PR.
 
 The three most recent releases; every release since 0.1 is in [CHANGELOG.md](./CHANGELOG.md) (releases before 2.0 were renumbered to a two-part scheme there — original git tags are unchanged).
 
+### v3.2 (Sep 2026)
+- PDFium is now the viewer's only engine: text selection, highlights, links, search, printing and text extraction all use it (pdf.js stays as the selectable classic renderer / automatic fallback). Selection boxes now come from the same engine that draws the glyphs; papers are no longer parsed twice (260 MB volume: ~65 MB main process + ~210 MB WebView while open); any zoom level renders via strip rendering; printing keeps highlight colours and holds nothing in JS memory
+- Help → Check for Updates… (one request to github.com, only when clicked) with in-app download & install; optional check at launch (off by default, disabled in offline mode). Installing a newer .msi over an older one upgrades in place — no uninstall needed
+
 ### v3.1 (Sep 2026)
 - Fixed 3.0 text looking soft: the page bitmap was resampled by a fraction of a pixel by the compositor; it is now displayed pixel-exact (portrait Focus Mode now matches the engine's own render 1:1)
 - PDFium stem darkening defaults to Off (crispest, Edge-like); Subtle / Standard / Strong remain selectable
@@ -232,12 +243,7 @@ The three most recent releases; every release since 0.1 is in [CHANGELOG.md](./C
 - 260 MB proceedings volume: open ~15 ms, ~30 MB memory, ~6 ms per page
 - Preferences → PDF render engine (PDFium / pdf.js classic) with automatic fallback; stem darkening remembered per engine (PDFium default Standard 0.35 ≈ Edge/Acrobat weight)
 
-### v2.8 (Sep 2026)
-- Status × Importance (3 × 3) replaced by one triage scale — ★ Noted / ★★ Relevant / ★★★ Core — plus a ⚑ Revisit flag; existing libraries are converted automatically (importance → level, "Revisit Needed" → flag)
-- Same stars/flag everywhere: sidebar rows, PAPERS filter chips (★ ★★ ★★★ | ⚑) and sort, tracker level picker, viewer toolbar, dashboard counts, CSV columns
-- Swipe a sidebar row right to toggle ⚑ Revisit (was: cycle status)
-
-Older releases (2.7 → 0.1) are in the **[full changelog](./CHANGELOG.md)**.
+Older releases (2.8 → 0.1) are in the **[full changelog](./CHANGELOG.md)**.
 
 ---
 

@@ -68,6 +68,7 @@ pub fn run() {
             pending_pdf.into_iter().collect(),
         )))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -94,6 +95,13 @@ pub fn run() {
             pdfium::pdfium_close_path,
             pdfium::pdfium_render,
             pdfium::pdfium_image_regions,
+            pdfium::pdfium_render_region,
+            pdfium::pdfium_render_png_to_file,
+            pdfium::pdfium_text,
+            pdfium::pdfium_page_text,
+            pdfium::pdfium_search,
+            pdfium::pdfium_links,
+            pdfium::pdfium_metadata,
             set_export_selected_enabled,
             take_pending_open_files,
             get_backup_config,
@@ -190,6 +198,7 @@ pub fn run() {
 
             let help_menu = SubmenuBuilder::new(app, "Help")
                 .text("shortcuts", "Keyboard Shortcuts\tCtrl+/")
+                .text("check-updates", "Check for Updates...")
                 .text("about", "About HYJI")
                 .text("github", "GitHub Repository")
                 .build()?;

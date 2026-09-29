@@ -1,5 +1,6 @@
 # per-machine outputs (local paths / library titles)
 out/
+out-*/
 corpus.json
 fixtures/
 __pycache__/

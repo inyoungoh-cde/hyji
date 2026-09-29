@@ -88,6 +88,8 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
   const [engineStatus, setEngineStatus] = useState<PdfiumStatus | null>(null);
   const usingPdfium = pdfRenderEngine === "pdfium" && engineStatus?.available !== false;
   const politeEmail = useNetworkStore((s) => s.politeEmail);
+  const autoUpdateCheck = useNetworkStore((s) => s.autoUpdateCheck);
+  const setAutoUpdateCheck = useNetworkStore((s) => s.setAutoUpdateCheck);
   const setPoliteEmail = useNetworkStore((s) => s.setPoliteEmail);
 
   const handleLayoutChange = (layout: StartupLayout) => {
@@ -282,6 +284,24 @@ export function PreferencesDialog({ open, onClose }: PreferencesDialogProps) {
                 leave empty to stay anonymous.
               </p>
             </div>
+
+            <label className={`mt-4 flex items-start gap-2 text-body text-text-primary ${offlineMode ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
+              <input
+                type="checkbox"
+                checked={autoUpdateCheck}
+                disabled={offlineMode}
+                onChange={(e) => setAutoUpdateCheck(e.target.checked)}
+                className="accent-[#58a6ff] mt-0.5"
+              />
+              <span>
+                Check for updates automatically at launch
+                <span className="block text-caption text-text-tertiary">
+                  {offlineMode
+                    ? "Offline mode disables this."
+                    : "Off by default. When on, HYJI asks github.com for the release feed once, ~5 s after launch, and only shows a dialog if a newer version exists. You can always check manually via Help → Check for Updates…"}
+                </span>
+              </span>
+            </label>
           </Section>
 
           <Section label="Auto-backup">

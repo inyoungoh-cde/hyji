@@ -8,6 +8,7 @@
     "updater:default",
     "updater:allow-check",
     "updater:allow-download-and-install",
+    "process:allow-restart",
     "shell:allow-open",
     "sql:default",
     "sql:allow-load",

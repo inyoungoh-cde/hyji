@@ -13,8 +13,7 @@ import { onMenuEvent, emitMenuEvent } from "../../lib/menuEvents";
 import { useKeywordsStore } from "../../stores/keywords";
 import { extractPdfMeta } from "../../lib/pdfMeta";
 import { closeDb } from "../../lib/db";
-import type { PDFDocumentProxy } from "pdfjs-dist";
-import type { PdfContextInfo } from "../pdf/PdfCanvas";
+import type { PdfContextInfo, PdfDocInfo } from "../pdf/PdfCanvas";
 import type { PdfContextMenuState } from "../pdf/ContextMenu";
 import { MemoEditor } from "../pdf/MemoEditor";
 import { Dashboard } from "../home/Dashboard";
@@ -45,7 +44,6 @@ export function PdfViewer() {
   // Bumped to force a full PdfCanvas remount after the PDF file itself was
   // rewritten in place (e.g. importing external annotations strips them).
   const [pdfReloadNonce, setPdfReloadNonce] = useState(0);
-  const docRef = useRef<PDFDocumentProxy | null>(null);
   const [extractModal, setExtractModal] = useState<{ title: string; paperId: string } | null>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const pdfCanvasRef = useRef<PdfCanvasHandle>(null);
@@ -68,9 +66,8 @@ export function PdfViewer() {
   // "Back to reading position" after clicking an internal PDF reference link
   const [backScrollTop, setBackScrollTop] = useState<number | null>(null);
 
-  const onDocLoaded = useCallback((doc: PDFDocumentProxy) => {
-    docRef.current = doc;
-    setTotalPages(doc.numPages);
+  const onDocLoaded = useCallback((info: PdfDocInfo) => {
+    setTotalPages(info.numPages);
     setCurrentPage(1);
   }, []);
 
@@ -303,22 +300,47 @@ export function PdfViewer() {
     };
   }, [focusMode]);
 
-  // Print: render pages at high resolution (highlights burned in) and hand
-  // them to the system print dialog via a hidden iframe.
+  // Print: one high-resolution page image per page (PDFium: PNG temp files
+  // + CSS annotation overlays; pdf.js: data URLs with highlights burned in)
+  // handed to the system print dialog via a hidden iframe. Images must have
+  // finished loading before print() — the PDFium ones come from disk.
+  const printingRef = useRef(false);
   const handlePrint = useCallback(async () => {
-    const imgs = await pdfCanvasRef.current?.getPrintImages();
-    if (!imgs || imgs.length === 0) return;
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;width:0;height:0;border:none;left:-9999px;";
-    document.body.appendChild(iframe);
-    const iDoc = iframe.contentDocument!;
-    iDoc.open();
-    iDoc.write(`<!DOCTYPE html><html><head><style>@page{margin:0;size:auto}body{margin:0}img{width:100%;display:block;page-break-after:always}</style></head><body>${imgs.map((s) => `<img src="${s}">`).join("")}</body></html>`);
-    iDoc.close();
-    setTimeout(() => {
-      iframe.contentWindow?.print();
-      setTimeout(() => iframe.remove(), 3000);
-    }, 300);
+    if (printingRef.current) return;
+    printingRef.current = true;
+    let job: Awaited<ReturnType<PdfCanvasHandle["getPrintPages"]>> | undefined;
+    try {
+      job = await pdfCanvasRef.current?.getPrintPages();
+      if (!job || job.pages.length === 0) return;
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "position:fixed;width:0;height:0;border:none;left:-9999px;";
+      document.body.appendChild(iframe);
+      const iDoc = iframe.contentDocument!;
+      iDoc.open();
+      iDoc.write(`<!DOCTYPE html><html><head><style>@page{margin:0;size:auto}body{margin:0}.page{position:relative;page-break-after:always;break-after:page}.page img{width:100%;display:block}.hl{position:absolute;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${job.pages.join("")}</body></html>`);
+      iDoc.close();
+      await Promise.all(
+        Array.from(iDoc.images).map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((res) => { img.onload = () => res(); img.onerror = () => res(); })
+        )
+      );
+      const cleanup = job.cleanup;
+      job = undefined;
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        // print() returns when the dialog closes (WebView2), but give the
+        // spooler a moment before the images disappear from disk.
+        setTimeout(() => { iframe.remove(); void cleanup(); }, 3000);
+      }, 100);
+    } catch (e) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(`Print failed: ${String(e)}`, { title: "Print", kind: "error" });
+    } finally {
+      await job?.cleanup();
+      printingRef.current = false;
+    }
   }, []);
 
   // Keyboard shortcuts
@@ -482,14 +504,12 @@ export function PdfViewer() {
           await message("Open a paper with a PDF first.", { title: "Import Annotations", kind: "info" });
           return;
         }
-        const doc = docRef.current;
-        if (!doc) {
-          await message("The PDF is still loading — try again in a moment.", { title: "Import Annotations", kind: "info" });
-          return;
-        }
         try {
           const { scanExternalAnnotations, removeAnnotationsFromPdf } = await import("../../lib/pdfAnnotImport");
-          const found = await scanExternalAnnotations(doc);
+          // pdf-lib reads the file directly (3.2) — no viewer document needed.
+          const { readFile, writeFile } = await import("@tauri-apps/plugin-fs");
+          const bytes = await readFile(paper.pdf_path);
+          const found = await scanExternalAnnotations(bytes);
           if (found.length === 0) {
             await message("No annotations from other PDF viewers were found in this file.", { title: "Import Annotations", kind: "info" });
             return;
@@ -502,8 +522,6 @@ export function PdfViewer() {
 
           // Compute the cleaned file first, then persist to DB, then rewrite
           // the file — a write failure leaves annotations safe in the DB.
-          const { readFile, writeFile } = await import("@tauri-apps/plugin-fs");
-          const bytes = await readFile(paper.pdf_path);
           const cleaned = await removeAnnotationsFromPdf(bytes, found);
 
           const { createAnnotation } = useAnnotationsStore.getState();

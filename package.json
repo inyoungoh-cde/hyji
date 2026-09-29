@@ -1,7 +1,7 @@
 {
   "name": "hyji",
   "private": true,
-  "version": "3.1.0",
+  "version": "3.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,8 +16,10 @@
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-sql": "^2.2.0",
+    "@tauri-apps/plugin-updater": "^2.13.0",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "pdf-lib": "^1.17.1",

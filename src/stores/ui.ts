@@ -111,9 +111,11 @@ interface UiState {
    *  the multiply pass smears 1-px stems into 2-px (25/56 %) — the softness
    *  users read as blur. Subtle/Standard remain for anyone who wants weight. */
   pdfiumTextDarkening: number;
-  /** Page rasterizer (v3.0): "pdfium" = hinted glyphs via the bundled PDFium
-   *  DLL (falls back to pdf.js when the DLL is unavailable); "pdfjs" = the
-   *  pre-3.0 renderer. Text layer, links and search always stay on pdf.js. */
+  /** PDF engine (v3.0 raster, v3.2 everything): "pdfium" = the bundled PDFium
+   *  DLL renders pages AND supplies the text layer, selection geometry,
+   *  links, search, print and text extraction — pdf.js never opens the file
+   *  (falls back to "pdfjs" when the DLL is unavailable); "pdfjs" = the
+   *  classic pre-3.0 viewer. */
   pdfRenderEngine: PdfRenderEngine;
   focusMode: boolean;
   preFocusState: PreFocusState | null;

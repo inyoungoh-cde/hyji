@@ -1,12 +1,75 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { openPdfDocument } from "./pdfSource";
 import { getBgPdfWorker } from "./pdfBgWorker";
+import { pdfiumAvailable, withPdfiumDoc } from "./pdfText";
+import { pdfiumMetadata, pdfiumText } from "./pdfium";
 
 export interface PdfMetaResult {
   title: string;
 }
 
+// Title heuristic shared by both engines: the largest-font text in the top
+// 40 % of the first page (lines within 75 % of the max font size, joined
+// top to bottom).
+function pickTitle(lines: Array<{ text: string; fontSize: number; y: number }>): string {
+  if (lines.length === 0) return "";
+  const maxFont = Math.max(...lines.map((l) => l.fontSize));
+  const threshold = maxFont * 0.75;
+  return lines
+    .filter((l) => l.fontSize >= threshold)
+    .sort((a, b) => a.y - b.y)
+    .map((l) => l.text.trim())
+    .filter((l) => l.length > 1)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function extractPdfMeta(pdfPath: string): Promise<PdfMetaResult> {
+  try {
+    if (await pdfiumAvailable()) return await extractPdfMetaPdfium(pdfPath);
+    return await extractPdfMetaPdfjs(pdfPath);
+  } catch {
+    return { title: "" };
+  }
+}
+
+async function extractPdfMetaPdfium(pdfPath: string): Promise<PdfMetaResult> {
+  return withPdfiumDoc(pdfPath, async (doc) => {
+    // 1. Info-dict Title
+    const metaTitle = (await pdfiumMetadata(doc.id)).title?.trim() ?? "";
+    if (metaTitle.length > 4 && !looksLikeFilename(metaTitle)) {
+      return { title: metaTitle };
+    }
+    if (doc.pages.length === 0) return { title: "" };
+
+    // 2. First page: PDFium lines (display points, y grows downwards)
+    const topZone = doc.pages[0].height * 0.4;
+    const { chars, lineBreaks } = await pdfiumText(doc.id, 0);
+    const lines: Array<{ text: string; fontSize: number; y: number }> = [];
+    let start = 0;
+    const flush = (end: number) => {
+      let text = "";
+      let fontSize = 0;
+      let y = Infinity;
+      for (let i = start; i < end; i++) {
+        const ch = chars[i];
+        text += ch.c;
+        if (ch.c.trim()) {
+          fontSize = Math.max(fontSize, ch.fontSize);
+          y = Math.min(y, ch.y);
+        }
+      }
+      if (text.trim() && fontSize > 0 && y < topZone) lines.push({ text, fontSize, y });
+      start = end;
+    };
+    for (const b of lineBreaks) flush(b + 1);
+    flush(chars.length);
+    return { title: pickTitle(lines) };
+  });
+}
+
+async function extractPdfMetaPdfjs(pdfPath: string): Promise<PdfMetaResult> {
   let doc: PDFDocumentProxy | null = null;
   try {
     doc = await openPdfDocument(pdfPath, { worker: getBgPdfWorker() });
@@ -25,7 +88,6 @@ export async function extractPdfMeta(pdfPath: string): Promise<PdfMetaResult> {
     const topZone = pageHeight * 0.4;
     const textContent = await page.getTextContent();
 
-    // Collect items with str + transform fields
     const items: Array<{ str: string; fontSize: number; y: number }> = [];
     for (const item of textContent.items) {
       if (!("str" in item) || !("transform" in item)) continue;
@@ -38,41 +100,22 @@ export async function extractPdfMeta(pdfPath: string): Promise<PdfMetaResult> {
         items.push({ str: s, fontSize, y });
       }
     }
-
     if (items.length === 0) return { title: "" };
 
-    const maxFont = Math.max(...items.map((i) => i.fontSize));
-    const threshold = maxFont * 0.75;
-
-    // Sort top-to-bottom (pdf y=0 is bottom, so higher y = higher on page)
-    const titleItems = items
-      .filter((i) => i.fontSize >= threshold)
-      .sort((a, b) => b.y - a.y);
-
-    // Group lines by similar y (within 2pt)
-    const lines: string[] = [];
-    let currentLine: string[] = [];
-    let lastY: number | null = null;
-    for (const item of titleItems) {
-      if (lastY === null || Math.abs(item.y - lastY) < 3) {
-        currentLine.push(item.str);
+    // Group items into lines by similar pdf-space y (within 3pt), top first.
+    const sorted = [...items].sort((a, b) => b.y - a.y);
+    const lines: Array<{ text: string; fontSize: number; y: number }> = [];
+    for (const item of sorted) {
+      const last = lines[lines.length - 1];
+      if (last && Math.abs(item.y - last.y) < 3) {
+        last.text += item.str;
+        last.fontSize = Math.max(last.fontSize, item.fontSize);
       } else {
-        if (currentLine.length) lines.push(currentLine.join("").trim());
-        currentLine = [item.str];
+        lines.push({ text: item.str, fontSize: item.fontSize, y: item.y });
       }
-      lastY = item.y;
     }
-    if (currentLine.length) lines.push(currentLine.join("").trim());
-
-    const title = lines
-      .filter((l) => l.length > 1)
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    return { title };
-  } catch {
-    return { title: "" };
+    // pickTitle sorts by ascending y (top-down); pdf y grows upwards → negate.
+    return { title: pickTitle(lines.map((l) => ({ ...l, y: -l.y }))) };
   } finally {
     await doc?.destroy().catch(() => undefined);
   }

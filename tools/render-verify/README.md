@@ -25,7 +25,7 @@ tools/render-verify/
   render-pdfjs.mjs  side A: pdf.js (legacy build, Node) -> page-NNNN.png
   <pdfium cli>      side B: same pages, same width, same file names
   compare.py        A vs B: size, SSIM, MAD, ink coverage; diffs/ for FAILs
-  run-all.py        loops the corpus, runs A, B and compare per paper
+  run-all.py        loops the corpus, runs A, B and compare per paper (--text adds the text-geometry stage)
 ```
 
 1. **Corpus** (copies the DB before reading so the running app's WAL/lock
@@ -125,6 +125,67 @@ tools/render-verify/
    Results land in `tools/render-verify/out/<paperId_title>/{pdfjs,pdfium,diffs}`
    with `report.md` / `report.json` at the top. Exit code 1 if any page FAILs.
 
+## Text-geometry parity (`--text`)
+
+The viewer's text layer (selection / highlight boxes, search hits) moves from
+pdf.js to PDFium too, so the harness also checks where the two engines say
+text *is*. Same page sample, same display frame (points, top-left origin,
+CropBox and /Rotate applied):
+
+```
+tools/render-verify/
+  text-pdfjs.mjs    A: page.getTextContent() runs -> text-NNNN.json (run box built like TextLayer's <span>)
+  text-pdfium.py    B: `pdfium-spike text <pdf> <page> <out.json>` -> per-char tight + loose boxes, origin
+  text-compare.py   A vs B: coverage both ways, baseline/advance offsets, flagged runs, overlays
+```
+
+```
+node   tools/render-verify/text-pdfjs.mjs  --pdf <file> --pages 0,1 --out outA-text
+python tools/render-verify/text-pdfium.py  --pdf <file> --pages 0,1 --out outB-text
+python tools/render-verify/text-compare.py --a outA-text --b outB-text --out results --pdf <file> [--overlay all]
+python tools/render-verify/run-all.py --text [--only fixtures] [--text-exe <pdfium-spike.exe>]
+```
+
+- **A (pdf.js)**: one record per text item ("run"). The box is exactly the
+  TextLayer span: `tx = Util.transform(viewport.transform, item.transform)`,
+  left/top from `tx[4]`, `tx[5] - ascent*fontHeight`, width = `item.width`,
+  height = `hypot(tx[2], tx[3])`, rotated by `atan2(tx[1], tx[0])`. The
+  ascent ratio is the TextLayer's fallback chain (`style.ascent`,
+  `1+style.descent`, 0.8); in the browser it measures the loaded @font-face
+  instead, so vertical extents can differ from the live viewer by a fraction
+  of the font size. pdf.js has **no per-character boxes** — `chars` are an
+  estimate (advance split equally over the characters), used only for
+  coverage matching with a tolerance.
+- **B (PDFium)**: every FPDFText character with tight box
+  (`FPDFText_GetCharBox`), loose box (`FPDFText_GetLooseCharBox`) and origin,
+  converted page space → display: `x' = x - crop.left`, `y' = crop.top - y`,
+  then 90°: `(H0-y', x')`, 180°: `(W0-x', H0-y')`, 270°: `(y', W0-x')`.
+  Verified by painting the boxes over the spike's own render of the
+  rotate90 / rotate270 / cropbox-offset fixtures. `gen` marks characters
+  pdfium synthesises (spaces / line breaks); they are ignored.
+- **Metrics per page** (`text-compare.md`): `A unc` = pdf.js chars with no
+  PDFium char within max(3 pt, 0.8 × font size) of the estimated position;
+  `B unc` = PDFium chars whose center lies in no pdf.js run box; together
+  these catch text one engine cannot extract (Type3, broken CMaps, CJK).
+  `B outside` = PDFium chars beyond the CropBox — FPDFText keeps them, pdf.js
+  drops them (never visible), reported but not counted. `ident` = per-run
+  text difference (1 − SequenceMatcher ratio, NFKC), informative only.
+  Offsets are measured **per run in the run's own frame**: `dx` = how far
+  the union of PDFium loose boxes starts/ends from the pdf.js advance
+  (max of the two edge errors), `dy` = mean baseline offset of the matched
+  PDFium origins. Mean and p95 over runs; a run with `dx` or `dy` > 2 pt
+  (`--flag-pt`) is **flagged**. Runs that cross the CropBox edge are
+  "edge" runs (pdf.js truncates glyph-wise, FPDFText does not) and are
+  skipped; runs matching no PDFium char are "unmatched".
+- **Overlays** (`<paper>/text-overlays/text-NNNN.png`, PDFium render at
+  1.5 px/pt, for pages with flags/coverage gaps or all with
+  `--overlay all`): left = pdf.js run boxes (red; thick magenta = flagged,
+  thick red = unmatched, orange = edge; red dot = uncovered pdf.js char),
+  right = PDFium loose boxes (blue; cyan fill = PDFium char no run covers).
+- `run-all.py --text` runs all three per paper (independent of
+  `--pdfium-cli`; the spike path comes from `--text-exe` / `PDFIUM_SPIKE`)
+  and appends a "Text geometry" table to `report.md` / `report.json`.
+
 ## Interpreting results
 
 - `A ink missing in B` is the number that matters for the swap: anything
@@ -151,4 +212,15 @@ tools/render-verify/
   the blob size is reported as 0 and only the global thresholds apply.
 - Without scikit-image, SSIM uses a built-in Gaussian-window implementation
   (pure numpy, slower, comparable numbers).
+- Text parity on `/UserUnit` pages: pdf.js's `PageViewport` scales the
+  transform by the UserUnit but `TextLayer` sizes spans with
+  `viewport.scale`, which excludes it, so pdf.js's own spans are UserUnit×
+  too narrow against its canvas; PDFium ignores UserUnit consistently.
+  `text-compare.py` rescales A into B's frame ("A scaled xK") and the
+  remaining width flags on such pages are that pdf.js inconsistency.
+- Text parity: pdf.js per-character positions are estimated (equal split of
+  the run advance), so `A unc` has a font-size-relative tolerance and cannot
+  see sub-glyph shifts; per-run `dx`/`dy` are exact. Vertical (`ascent`)
+  extents on side A follow the TextLayer fallback chain, not the browser's
+  measured font ascent.
 - Everything runs offline; no PDF or metadata leaves the machine.

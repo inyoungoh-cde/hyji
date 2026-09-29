@@ -1,6 +1,8 @@
 import { getDb } from "./db";
 import { openPdfDocument } from "./pdfSource";
 import { getBgPdfWorker } from "./pdfBgWorker";
+import { pdfiumAvailable, withPdfiumDoc } from "./pdfText";
+import { pdfiumPageText } from "./pdfium";
 import type { Paper } from "../types";
 
 /**
@@ -51,6 +53,21 @@ async function ensureTables(): Promise<boolean> {
 
 /** Extract per-page plain text from a PDF file. */
 async function extractPages(pdfPath: string): Promise<string[]> {
+  // PDFium engine (3.2): text straight from the Rust side, no pdf.js.
+  if (await pdfiumAvailable()) {
+    return withPdfiumDoc(pdfPath, async (doc) => {
+      const pages: string[] = [];
+      for (let i = 0; i < doc.pages.length; i++) {
+        const text = await pdfiumPageText(doc.id, i);
+        pages.push(text.replace(/\s+/g, " ").trim());
+      }
+      return pages;
+    });
+  }
+  return extractPagesPdfjs(pdfPath);
+}
+
+async function extractPagesPdfjs(pdfPath: string): Promise<string[]> {
   // Indexing runs on the shared background worker — on the viewer's global
   // worker, a first-run library index queues every page the user opens.
   const doc = await openPdfDocument(pdfPath, { worker: getBgPdfWorker() });

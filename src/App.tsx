@@ -10,11 +10,14 @@ import { AboutModal } from "./components/shared/AboutModal";
 import { KeyboardShortcutsModal } from "./components/shared/KeyboardShortcutsModal";
 import { PreferencesDialog } from "./components/shared/PreferencesDialog";
 import { GlobalSearch } from "./components/shared/GlobalSearch";
+import { UpdateDialog } from "./components/shared/UpdateDialog";
 import { ensureLibraryIndexed } from "./lib/ftsSearch";
 import { useUiStore, SIDEBAR_DEFAULT, TRACKER_DEFAULT } from "./stores/ui";
 import { usePapersStore } from "./stores/papers";
 import { useProjectsStore } from "./stores/projects";
 import { useKeywordsStore } from "./stores/keywords";
+import { useNetworkStore } from "./stores/network";
+import { useUpdaterStore } from "./stores/updater";
 import { emitMenuEvent, onMenuEvent } from "./lib/menuEvents";
 import { importOrOpenPdf } from "./lib/openPdf";
 
@@ -97,6 +100,7 @@ export default function App() {
       onMenuEvent("toggle-tracker", toggleTracker),
       onMenuEvent("reset-layout", () => useUiStore.getState().resetPanelSizes()),
       onMenuEvent("about", () => setAboutOpen(true)),
+      onMenuEvent("check-updates", () => { useUpdaterStore.getState().runCheck(); }),
       onMenuEvent("shortcuts", () => setShortcutsOpen(true)),
       onMenuEvent("preferences", () => setPreferencesOpen(true)),
       onMenuEvent("find-paper", () => useUiStore.getState().openSearchOverlay("library")),
@@ -168,6 +172,17 @@ export default function App() {
       cancelled = true;
       unlisten?.();
     };
+  }, []);
+
+  // Opt-in launch-time update check (v3.2). Off by default; never runs in
+  // offline mode. Silent unless a newer release exists.
+  useEffect(() => {
+    const { autoUpdateCheck, offlineMode } = useNetworkStore.getState();
+    if (!autoUpdateCheck || offlineMode) return;
+    const t = setTimeout(() => {
+      useUpdaterStore.getState().runCheck({ silent: true });
+    }, 5000);
+    return () => clearTimeout(t);
   }, []);
 
   // PDF file association + single instance. PDFs to open arrive in a Rust-side
@@ -259,6 +274,7 @@ export default function App() {
       {shortcutsOpen && <KeyboardShortcutsModal onClose={() => setShortcutsOpen(false)} />}
       <PreferencesDialog open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
       <GlobalSearch />
+      <UpdateDialog />
     </div>
   );
 }

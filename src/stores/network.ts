@@ -32,15 +32,22 @@ interface NetworkState {
    *  limits — the anonymous pool intermittently answers HTTP 429. Empty =
    *  anonymous (the v2.0 default); sent only to api.crossref.org. */
   politeEmail: string;
+  /** Opt-in (v3.2): check the GitHub release feed for a newer HYJI ~5 s after
+   *  launch. Off by default — the privacy policy promises no automatic
+   *  network requests unless the user turns one on. Ignored while offline
+   *  mode is on. */
+  autoUpdateCheck: boolean;
   setOfflineMode: (on: boolean) => void;
   grantFetchConsent: () => void;
   setPoliteEmail: (email: string) => void;
+  setAutoUpdateCheck: (on: boolean) => void;
 }
 
 export const useNetworkStore = create<NetworkState>((set) => ({
   offlineMode: loadBool("hyji:offline-mode", false),
   fetchConsented: loadBool("hyji:fetch-consent", false),
   politeEmail: loadString("hyji:polite-email"),
+  autoUpdateCheck: loadBool("hyji:auto-update-check", false),
 
   setOfflineMode: (on) => {
     persistBool("hyji:offline-mode", on);
@@ -54,5 +61,9 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     const v = email.trim();
     try { localStorage.setItem("hyji:polite-email", v); } catch { /* ignore */ }
     set({ politeEmail: v });
+  },
+  setAutoUpdateCheck: (on) => {
+    persistBool("hyji:auto-update-check", on);
+    set({ autoUpdateCheck: on });
   },
 }));

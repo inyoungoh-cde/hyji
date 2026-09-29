@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openPdfDocument } from "./pdfSource";
 import { getBgPdfWorker } from "./pdfBgWorker";
+import { pdfiumAvailable, withPdfiumDoc } from "./pdfText";
+import { pdfiumPageText } from "./pdfium";
 import { normalizeVenue } from "./venueMap";
 import { useNetworkStore } from "../stores/network";
 import type { Paper, RefType } from "../types";
@@ -58,6 +60,24 @@ function cleanDoi(raw: string): string {
 
 /** Pull a DOI / arXiv id from the first two pages of the paper's PDF. */
 export async function extractIdentifiersFromPdf(pdfPath: string): Promise<Identifiers> {
+  const text = (await pdfiumAvailable())
+    ? await withPdfiumDoc(pdfPath, async (doc) => {
+        let t = "";
+        for (let i = 0; i < Math.min(2, doc.pages.length); i++) {
+          t += (await pdfiumPageText(doc.id, i)).replace(/\n/g, " ") + " ";
+        }
+        return t;
+      })
+    : await firstPagesTextPdfjs(pdfPath);
+  const doiMatch = text.match(DOI_RE);
+  const arxivMatch = text.match(ARXIV_RE);
+  return {
+    doi: doiMatch ? cleanDoi(doiMatch[1]) : null,
+    arxivId: arxivMatch ? arxivMatch[1] : null,
+  };
+}
+
+async function firstPagesTextPdfjs(pdfPath: string): Promise<string> {
   const doc = await openPdfDocument(pdfPath, { worker: getBgPdfWorker() });
   let text = "";
   try {
@@ -71,12 +91,7 @@ export async function extractIdentifiersFromPdf(pdfPath: string): Promise<Identi
   } finally {
     await doc.destroy().catch(() => undefined);
   }
-  const doiMatch = text.match(DOI_RE);
-  const arxivMatch = text.match(ARXIV_RE);
-  return {
-    doi: doiMatch ? cleanDoi(doiMatch[1]) : null,
-    arxivId: arxivMatch ? arxivMatch[1] : null,
-  };
+  return text;
 }
 
 const CROSSREF_TYPE: Record<string, RefType> = {

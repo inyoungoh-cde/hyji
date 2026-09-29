@@ -7,6 +7,25 @@ All notable changes to HYJI will be documented in this file.
 > 1.0.0→1.0 … 1.0.7→1.7). The original git tags are kept and noted next to each entry;
 > installer files and download links are unchanged.
 
+## [3.2] - 2026-09-29
+
+### Changed
+
+- **PDFium is now the only engine the viewer uses.** 3.0 moved rasterization to PDFium but kept pdf.js for the text layer, links, search and text extraction — so every open paper was parsed twice, selection boxes came from a different engine than the glyphs, and full-page bitmaps had to cross the IPC bridge in one piece. All of that now runs on PDFium (new Rust commands for per-character text boxes, links, sub-rectangle rendering, search, page text, metadata and PNG output):
+  - **Selection and highlights use the engine's own character boxes** — the band you see is exactly where the text was drawn. Measured against the old pdf.js layer on 12 real papers, the two engines agreed to 0.5 pt at the 95th percentile anyway, and on PDFs with `/UserUnit` PDFium is the one that is right (pdf.js's spans were half the width of its own canvas text).
+  - **Search highlights exactly the matched characters** (per line) instead of whole text runs, and the count refreshes as more pages render.
+  - **Large files stop being parsed twice.** The 736-page / 260 MB proceedings volume now runs with the main process at ~65 MB and the WebView at ~210 MB while open (3.1: ~45 MB + ~650 MB); a full-text indexing pass no longer pins the whole document to the viewer's handle (background scans open their own handle and release it).
+  - **Any zoom level renders** — pages above 16 MB of pixels are fetched in horizontal strips, so 400 % on a 125 % monitor no longer falls back to the classic renderer.
+  - **Printing** renders each page to a temporary PNG on the Rust side and overlays your highlights, underlines, strikeouts and memos as CSS; nothing is held in JavaScript memory, and the highlight colours are preserved on paper (`print-color-adjust`).
+  - Search indexing, keyword / metadata / DOI extraction and annotation import no longer use pdf.js either (annotation import reads the file with pdf-lib).
+  - The classic pdf.js renderer remains selectable in Preferences → PDF render engine and is still the automatic fallback when the PDFium library is unavailable.
+- **Known limitation (PDFium engine):** PDFs that attach `/ActualText` to equations (some LaTeX workflows) expose the LaTeX source instead of the visible symbols to PDFium, so those formulas cannot be selected or searched under the PDFium engine — switch to pdf.js (classic) for such a document. Text lying outside the page's CropBox is ignored.
+
+### Added
+
+- **Help → Check for Updates…** HYJI can now look for a newer release itself. The check is one HTTPS request to `github.com` (this repository's release feed, `latest.json`) and happens only when you click the menu item; the dialog says so in its footer. Result: "You're up to date (3.x)" or "HYJI 3.y is available" with the release notes and a **Download & install** button that fetches the signed installer from GitHub Releases, verifies its signature, shows download progress, and restarts HYJI into the new version. In offline mode the item explains that offline mode must be turned off first and sends nothing.
+- **Optional check at launch.** Preferences → Network & privacy gains "Check for updates automatically at launch" — **off by default**, disabled while offline mode is on. When on, the same single request runs ~5 s after startup and only shows the dialog if a newer version exists. (Until now the bundled updater was never called, so no check ever happened; that remains the default.)
+
 ## [3.1] - 2026-09-28
 
 ### Fixed

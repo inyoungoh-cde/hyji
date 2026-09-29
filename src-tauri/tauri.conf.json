@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/schemas/master/tauri/v2/tauri.conf.schema.json",
   "productName": "HYJI",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "identifier": "com.hyji.app",
   "build": {
     "frontendDist": "../dist",
@@ -60,8 +60,6 @@
       "preload": ["sqlite:hyji.db"]
     },
     "updater": {
-      "active": true,
-      "dialog": true,
       "endpoints": [
         "https://github.com/inyoungoh-cde/hyji/releases/latest/download/latest.json"
       ],
